@@ -21,12 +21,15 @@ class Globals(object):
     g.font_size = 16, 24
     g.gravity = 0.01
     g.nextwavestep = 1
-    g.level = [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)]
-    g.level_scaled = list(_scaled(g.level, g.w, g.h))
+    g.level_layouts = [
+        [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)],
+    ]
+    g.level = list(_scaled(g.level_layouts[0], g.w, g.h))
     g.clock = None
     g.font = None
     g.smallfont = None
     g.max_drag_dist = 200
+    g.max_towers = 20
 
     g.reset()
 
@@ -56,23 +59,27 @@ class Monster(object):
     self.hp = 10 * level
     self.checkpoint = 0
     self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
-    self.original_speed = self.speed
     self.danger = 0
-    self.armor = level * 0.1
-    self.original_color = (random.randint(1,3) * 63, random.randint(1,3) * 63, random.randint(1,3) * 63)
-    self.color = self.original_color
-    self.x, self.y = g.level_scaled[self.checkpoint]
+    self.armor = max(0, (level - 5) * 0.2)
+    self.color = (random.randint(1,3) * 63, random.randint(1,3) * 63,
+        random.randint(1,3) * 63)
+    self.x, self.y = g.level[self.checkpoint]
     if level % 3 == 0:
       self.square = True
       self.armor = (self.armor + 1) * 2
       self.hp *= 0.5
+      self.speed *= 0.8
     else:
       self.square = False
+
     self.maxhp = float(self.hp)
+    self.original_speed = self.speed
+    self.original_color = self.color
+    self.original_armor = self.armor
 
   def draw(self):
-    point1 = g.level_scaled[self.checkpoint]
-    point2 = g.level_scaled[self.checkpoint + 1]
+    point1 = g.level[self.checkpoint]
+    point2 = g.level[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
     self.x += cos(angle) * self.speed
     self.y += sin(angle) * self.speed
@@ -86,7 +93,7 @@ class Monster(object):
           die()
       else:
         self.checkpoint += 1
-        self.x, self.y = g.level_scaled[self.checkpoint]
+        self.x, self.y = g.level[self.checkpoint]
 
     if self.square:
       pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
@@ -94,12 +101,14 @@ class Monster(object):
       pygame.draw.circle(g.screen, self.color, (int(self.x), int(self.y)), 5, 2)
 
   def damage(self, damage, tower):
-    freeze = (tower.blue / 2048.0)
-    damage -= self.armor * (1 - tower.pierce)
+    damage -= self.armor * (1 - tower.armor_pierce)
     self.hp -= damage
     self.color = _scale_color(self.color, self.hp / self.maxhp)
-    self.speed -= freeze * self.original_speed
+    self.speed -= tower.freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed / 2.0, self.speed))
+    if tower.armor_decay:
+      self.armor -= tower.armor_decay
+      self.armor = min(self.original_armor, max(self.original_armor / 2.0, self.armor))
     if self.hp <= 0 and -self.hp <= damage:
       return True
     return False
@@ -121,17 +130,11 @@ class Wave(object):
 
 
 class Tower(object):
+  starting_towers = [(64, 64, 0), (64, 0, 64), (0, 64, 64), (128, 0, 0),
+      (0, 128, 0), (0, 0, 128)]
   def __init__(self):
-    self.red = 64
-    self.blue = 64
-    self.green = 64
-    color = random.randint(1,3)
-    if color == 1:
-      self.red = 0
-    elif color == 2:
-      self.green = 0
-    else:
-      self.blue = 0
+    self.color = random.choice(self.starting_towers)
+    self.red, self.green, self.blue = self.color
     self.size = 1
     self.x = g.w
     self.y = g.h * 0.5
@@ -144,38 +147,45 @@ class Tower(object):
     self.update_stats()
 
   def update_stats(self):
-    self.yellow = max(0, (self.red + self.green) / 2 - self.blue - abs(self.red - self.green))
-    self.cyan = max(0, (self.blue + self.green) / 2 - self.red - abs(self.blue - self.green))
-    self.magenta = max(0, (self.blue + self.red) / 2 - self.green - abs(self.blue - self.red))
+    r, g, b = self.red, self.green, self.blue
+    self.yellow = max(0, (r + g) / 2 - b - abs(r - g))
+    self.cyan = max(0, (b + g) / 2 - r - abs(b - g))
+    self.magenta = max(0, (b + r) / 2 - g - abs(b - r))
 
     size_damage = 1 + self.size / 10.0
-    red_damage = self.red / 16.0
+    red_damage = r / 16.0
     self.damage = size_damage + red_damage
-    self.color = (self.red, self.green, self.blue)
-    self.pierce = 0
-    self.radius = int(10 + sqrt(self.size * pi))
-    self.range = int(self.radius + 30 + sqrt(self.green * 10) * 2)
+
+    self.color = (r, g, b)
+    self.armor_decay = sqrt(self.magenta / 2048.0)
+    self.freeze = self.cyan / 2048.0
+    self.armor_pierce = 0
+    self.inflate = (self.yellow / 255.0) ** 4 * 2
+    self.radius = int(sqrt((50 + self.size) * (1+self.inflate) * pi))
+    self.range = int(self.radius + 30 + sqrt(self.blue * 10) * 2)
+
+    self.shot_delay = max(0.1, 0.5 - (1 * self.green / 255.0) + (self.size / 500.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
-      self.shot_delay = 1 / 6.5
-    else:
-      self.shot_delay = 0.4 - (0.3 * self.yellow / 255.0)
+      self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
     self.inertia = 4.0 / (4 + self.size)
     if self.color == (0, 0, 0):
-      self.pierce = 1
+      self.armor_pierce = 1
 
     self.stats = []
     self.stats.append("damage: %d + %d" % (size_damage, red_damage))
     self.stats.append("range: %d" % self.range)
-    self.stats.append("freeze: %.2f" % (self.blue / 2048.0))
-    self.stats.append("")
     self.stats.append("attack speed: %.2f" % (1 / self.shot_delay))
-    self.stats.append("armor decay: %.2f" % (self.cyan / 2048.0))
+    self.stats.append("")
+    if self.freeze > 0:
+      self.stats.append("cyan: %.3f freeze" % self.freeze)
+    if self.armor_decay > 0:
+      self.stats.append("magenta: %.2f armor destruction" % self.armor_decay)
+    if self.inflate > 0:
+      self.stats.append("yellow: %d%% inflation" % (self.inflate * 100))
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
-      self.stats.append("purity bonus: +4 aspd")
-#    if self.yellow > 0:
-#      self.stats.append("yellow: +%.2f aspd" % (1 / self.shot_delay - 2.5))
+      self.stats.append("purity bonus: +2 aspd")
     self.stats.append("")
     self.stats.append("mass: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
@@ -214,8 +224,8 @@ class Tower(object):
     y = int(self.y - hhalf)
 #    pygame.draw.circle(g.screen, (0, 255, 255), (int(self.x), int(self.y)), self.radius, 0)
     self.phase = (self.phase + pi/12) % (2*pi)
-#    rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
-#    pygame.draw.ellipse(g.screen, (0, 0, 0), rect, 0)
+    rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
+    pygame.draw.ellipse(g.screen, (20, 20, 20), rect, 0)
     rect = Rect(x, y, whalf*2, hhalf*2)
     pygame.draw.ellipse(g.screen, self.color, rect, 0)
 
@@ -235,7 +245,7 @@ class Tower(object):
     self.last_shot = time.time()
     target = max(mobs, key=lambda mob: mob.danger)
     pygame.draw.circle(g.screen, self.color, (int(target.x), int(target.y)), self.radius, 0)
-    pygame.draw.line(g.screen, self.color, (int(self.x), int(self.y)), (int(target.x), int(target.y)), self.radius * 2)
+    pygame.draw.line(g.screen, self.color, (int(self.x), int(self.y)), (int(target.x), int(target.y)), self.radius)
 
     for mob in g.mobs:
       if mob.hp > 0 and \
@@ -277,13 +287,6 @@ def _draw_bar(x, y, length, width, color):
 #}}}
 
 
-def call_next_wave():
-  g.nextwave = g.nextwavemax
-  g.levelnumber += 1
-  g.log("Level %d" % g.levelnumber)
-  g.waves.append(Wave(g.levelnumber))
-
-
 def keyhandler(key):
   if key == K_F1:
     g.log("Space: Pause game")
@@ -300,18 +303,19 @@ def keyhandler(key):
   elif key == ord("c"):
     g.logged.clear()
   elif key == ord("n"):
-    call_next_wave()
+    g.nextwave = 0
   elif key == ord("b"):
-    g.towers.append(Tower())
+    if len(g.towers) < g.max_towers:
+      g.towers.append(Tower())
   elif key == ord(" "):
     g.pause ^= True
   elif key in (K_1, K_2, K_3):
     if g.active:
       c = {K_1: "red", K_2: "green", K_3: "blue"}[key]
       if pygame.key.get_mods() & KMOD_SHIFT:
-        if g.active.__dict__[c] > 0:
+        if g.hp > 2 and g.active.__dict__[c] > 0:
+          g.hp -= 0.5
           g.active.__dict__[c] = max(0, g.active.__dict__[c] - 16)
-          g.hp = min(g.maxhp, g.hp + 0.5)
       else:
         if g.hp > 2 and g.active.__dict__[c] < 255:
           g.hp -= 1
@@ -358,9 +362,12 @@ def die():
     g.towers.remove(towers[0])
     life = min(10, int(towers[0].size / 20))
     g.log("Your strongest bubble sacrificed itself to give you %d life!" % life)
+    if g.active == towers[0]:
+      g.active = None
+      g.drag = None  # g.drag == X implies g.active == X
     g.hp += life
   else:
-    g.log("You have lost the game! Press F10 to reset.")
+    g.log("You have lost the game! Press F10 to restart.")
     g.log("Final Score: %d" % g.score)
 
 
@@ -372,9 +379,14 @@ def draw():
 
   g.hp = min(g.maxhp, g.hp + g.hpregeneration)
   if g.towers or g.levelnumber:
+#    if g.levelnumber % 20 == 0:
+
     g.nextwave -= g.nextwavestep
     if g.nextwave <= 0:
-      call_next_wave()
+      g.nextwave = g.nextwavemax
+      g.levelnumber += 1
+      g.log("Level %d" % g.levelnumber)
+      g.waves.append(Wave(g.levelnumber))
 
   g.screen.fill((0, 0, 0))
 
@@ -382,8 +394,8 @@ def draw():
     pygame.draw.circle(g.screen, (32, 32, 32), (int(g.active.x),
       int(g.active.y)), g.active.range, 0)
 
-  pygame.draw.lines(g.screen, (100, 0, 0), False, g.level_scaled, 10)
-  for dot in g.level_scaled:
+  pygame.draw.lines(g.screen, (100, 0, 0), False, g.level, 10)
+  for dot in g.level:
     pygame.draw.circle(g.screen, (100, 0, 0), dot, 4, 0)
 
   for wave in list(g.waves):
@@ -471,7 +483,6 @@ def run():
   pygame.key.set_repeat(180, 80)
   flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
   if g.fullscreen:
-    pygame.mouse.set_visible(False)
     flags |= pygame.FULLSCREEN
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
   g.smallfont = pygame.font.Font(g.font_name, g.font_size[0])
@@ -496,7 +507,6 @@ def run():
         if event.key == K_ESCAPE or event.key == K_q:
           return
         elif event.key == K_F11:
-          pygame.mouse.set_visible(not pygame.mouse.set_visible(False))
           pygame.display.toggle_fullscreen()
         else:
           keyhandler(event.key)
