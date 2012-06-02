@@ -26,6 +26,7 @@ class Globals(object):
     g.clock = None
     g.font = None
     g.smallfont = None
+    g.max_drag_dist = 200
 
     g.reset()
 
@@ -57,7 +58,7 @@ class Monster(object):
     self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
     self.original_speed = self.speed
     self.danger = 0
-    self.armor = 0
+    self.armor = level * 0.1
     self.original_color = (random.randint(1,3) * 63, random.randint(1,3) * 63, random.randint(1,3) * 63)
     self.color = self.original_color
     self.x, self.y = g.level_scaled[self.checkpoint]
@@ -82,8 +83,7 @@ class Monster(object):
         self.hp = 0
         g.hp -= 1
         if g.hp <= 0:
-          g.log("You have lost the game! Press F10 to reset.")
-          g.log("Final Score: %d" % g.score)
+          die()
       else:
         self.checkpoint += 1
         self.x, self.y = g.level_scaled[self.checkpoint]
@@ -93,11 +93,12 @@ class Monster(object):
     else:
       pygame.draw.circle(g.screen, self.color, (int(self.x), int(self.y)), 5, 2)
 
-  def damage(self, damage, freeze):
-    damage -= self.armor
+  def damage(self, damage, tower):
+    freeze = (tower.blue / 2048.0)
+    damage -= self.armor * (1 - tower.pierce)
     self.hp -= damage
     self.color = _scale_color(self.color, self.hp / self.maxhp)
-    self.speed *= 1 - (freeze / 2048.0)
+    self.speed -= freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed / 2.0, self.speed))
     if self.hp <= 0 and -self.hp <= damage:
       return True
@@ -131,7 +132,7 @@ class Tower(object):
       self.green = 0
     else:
       self.blue = 0
-    self.size = 0
+    self.size = 1
     self.x = g.w
     self.y = g.h * 0.5
     self.vx = random.randint(-100, -40)
@@ -151,12 +152,16 @@ class Tower(object):
     red_damage = self.red / 16.0
     self.damage = size_damage + red_damage
     self.color = (self.red, self.green, self.blue)
-    self.range = int(50 + sqrt(self.green * 10) * 2)
+    self.pierce = 0
     self.radius = int(10 + sqrt(self.size * pi))
+    self.range = int(self.radius + 30 + sqrt(self.green * 10) * 2)
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
-      self.shot_delay = 1 / 3.5
+      self.shot_delay = 1 / 6.5
     else:
       self.shot_delay = 0.4 - (0.3 * self.yellow / 255.0)
+    self.inertia = 4.0 / (4 + self.size)
+    if self.color == (0, 0, 0):
+      self.pierce = 1
 
     self.stats = []
     self.stats.append("damage: %d + %d" % (size_damage, red_damage))
@@ -164,14 +169,15 @@ class Tower(object):
     self.stats.append("freeze: %.2f" % (self.blue / 2048.0))
     self.stats.append("")
     self.stats.append("attack speed: %.2f" % (1 / self.shot_delay))
+    self.stats.append("armor decay: %.2f" % (self.cyan / 2048.0))
     if self.color == (0, 0, 0):
-      self.stats.append("black hole bonus: 100% armor piercing")
+      self.stats.append("black hole bonus: armor piercing")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
-      self.stats.append("purity bonus: +1 aspd")
+      self.stats.append("purity bonus: +4 aspd")
 #    if self.yellow > 0:
 #      self.stats.append("yellow: +%.2f aspd" % (1 / self.shot_delay - 2.5))
     self.stats.append("")
-    self.stats.append("mass: %d" % (10 + self.size))
+    self.stats.append("mass: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
 
   def act(self):
@@ -180,8 +186,8 @@ class Tower(object):
       mousex = max(0, min(g.w, mousex))
       mousey = max(0, min(g.h, mousey))
 #      g.log("%d, %d" % (mousex, mousey))
-      self.vx += (mousex - self.x) / 20
-      self.vy += (mousey - self.y) / 20
+      self.vx += (mousex - self.x) / 20 * self.inertia
+      self.vy += (mousey - self.y) / 20 * self.inertia
     else:
       if self.y + self.radius < g.h:
         self.vy += g.gravity
@@ -192,8 +198,11 @@ class Tower(object):
       self.vx *= -1
     if self.y - self.radius < 0 or self.y + self.radius > g.h:
       self.vy *= -1
-    self.vx *= 0.95
-    self.vy *= 0.95
+
+    if self.size < 50:
+      slowdown = 0.95 + self.size / 1000.0
+      self.vx *= slowdown
+      self.vy *= slowdown
 
     if self.last_shot + self.shot_delay < time.time():
       self.shoot()
@@ -205,10 +214,11 @@ class Tower(object):
     y = int(self.y - hhalf)
 #    pygame.draw.circle(g.screen, (0, 255, 255), (int(self.x), int(self.y)), self.radius, 0)
     self.phase = (self.phase + pi/12) % (2*pi)
-    rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
-    pygame.draw.ellipse(g.screen, (0, 0, 0), rect, 0)
+#    rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
+#    pygame.draw.ellipse(g.screen, (0, 0, 0), rect, 0)
     rect = Rect(x, y, whalf*2, hhalf*2)
     pygame.draw.ellipse(g.screen, self.color, rect, 0)
+
 
   def _get_monsters_in_range(self):
     for mob in g.mobs:
@@ -232,7 +242,7 @@ class Tower(object):
           abs(mob.x - target.x) < self.radius and \
           abs(mob.y - target.y) < self.radius and \
           sqrt((mob.x - target.x) ** 2 + (mob.y - target.y) ** 2) < self.radius:
-        if mob.damage(self.damage, self.blue):
+        if mob.damage(self.damage, self):
           self.size += 1
           self.update_stats()
           g.score += mob.level
@@ -316,19 +326,19 @@ def keyhandler(key):
 
 def key_pressed_handler(pressed):
   if (pressed[ord("j")] or pressed[K_DOWN]) and g.active:
-    g.active.vy += 2
+    g.active.vy += 4.0 * g.active.inertia
   if (pressed[ord("k")] or pressed[K_UP]) and g.active:
-    g.active.vy -= 2
+    g.active.vy -= 4.0 * g.active.inertia
   if (pressed[ord("h")] or pressed[K_LEFT]) and g.active:
-    g.active.vx -= 2
+    g.active.vx -= 4.0 * g.active.inertia
   if (pressed[ord("l")] or pressed[K_RIGHT]) and g.active:
-    g.active.vx += 2
+    g.active.vx += 4.0 * g.active.inertia
 
 
 def click(action, pos, button):
   if button == 1:
     if action == MOUSEBUTTONDOWN:
-      for tower in g.towers:
+      for tower in reversed(g.towers):
         dist = sqrt((tower.x - pos[0])**2 + (tower.y - pos[1])**2)
         if dist <= tower.radius:
           g.drag = tower
@@ -340,6 +350,18 @@ def click(action, pos, button):
       g.drag = None
   elif button == 3:
     g.active = None
+
+
+def die():
+  towers = [t for t in g.towers if t.size >= 20]
+  if towers:
+    g.towers.remove(towers[0])
+    life = min(10, int(towers[0].size / 20))
+    g.log("Your strongest bubble sacrificed itself to give you %d life!" % life)
+    g.hp += life
+  else:
+    g.log("You have lost the game! Press F10 to reset.")
+    g.log("Final Score: %d" % g.score)
 
 
 def draw():
@@ -376,9 +398,34 @@ def draw():
     else:
       mob.draw()
 
-  for tower in list(g.towers):
+  if g.drag:
+    mouse = pygame.mouse.get_pos()
+    dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
+    dist = sqrt(dx*dx + dy*dy)
+    if dist < g.max_drag_dist:
+      g.drag_to = mouse
+    else:
+      angle = atan2(dy, dx)
+      g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
+                  g.drag.y + g.max_drag_dist * sin(angle)
+
+  g.towers.sort(key=lambda tower: -tower.size)
+  for i, tower in enumerate(list(g.towers)):
     tower.act()
     tower.draw()
+    for other in g.towers[i+1:]:
+      angle = atan2(tower.y - other.y, tower.x - other.x)
+      distance = sqrt((tower.y - other.y)**2 + (tower.x - other.x)**2)
+      if distance > 5:
+        attraction = (tower.size + other.size) / 10 / distance
+        tower.vx -= cos(angle) * attraction * tower.inertia
+        tower.vy -= sin(angle) * attraction * tower.inertia
+        other.vx += cos(angle) * attraction * other.inertia
+        other.vy += sin(angle) * attraction * other.inertia
+
+  if g.drag:
+    pygame.draw.line(g.screen, g.drag.color, (int(g.drag.x), int(g.drag.y)),
+        g.drag_to, 3)
 
   _draw_bar(g.w-120, 15, int(100*g.nextwave/g.nextwavemax), 2, (150, 150, 0))
   if g.hp > 0:
