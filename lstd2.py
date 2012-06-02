@@ -28,7 +28,7 @@ class Globals(object):
     g.clock = None
     g.font = None
     g.smallfont = None
-    g.max_drag_dist = 200
+    g.max_drag_dist = 100
     g.max_towers = 20
 
     g.reset()
@@ -130,8 +130,9 @@ class Wave(object):
 
 
 class Tower(object):
-  starting_towers = [(64, 64, 0), (64, 0, 64), (0, 64, 64), (128, 0, 0),
-      (0, 128, 0), (0, 0, 128)]
+  starting_towers = [(64, 0, 0), (0, 64, 0), (0, 0, 64)]
+#  starting_towers = [(64, 64, 0), (64, 0, 64), (0, 64, 64), (128, 0, 0),
+#      (0, 128, 0), (0, 0, 128)]
   def __init__(self):
     self.color = random.choice(self.starting_towers)
     self.red, self.green, self.blue = self.color
@@ -157,37 +158,39 @@ class Tower(object):
     self.damage = size_damage + red_damage
 
     self.color = (r, g, b)
-    self.armor_decay = sqrt(self.magenta / 2048.0)
-    self.freeze = self.cyan / 2048.0
+    self.armor_decay = sqrt(self.cyan / 2048.0)
+    self.freeze = b / 2048.0
     self.armor_pierce = 0
-    self.inflate = (self.yellow / 255.0) ** 4 * 2
+    self.inflate = (self.magenta / 255.0) ** 4 * 3
     self.radius = int(sqrt((50 + self.size) * (1+self.inflate) * pi))
-    self.range = int(self.radius + 30 + sqrt(self.blue * 10) * 2)
+    self.range = int(self.radius + 30 + sqrt(g * 10) * 2)
 
-    self.shot_delay = max(0.1, 0.4 - (0.3 * self.green / 255.0) + (self.size / 500.0))
+    self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
-    self.inertia = 4.0 / (4 + self.size)
+    self.inertia = 4.0 / (4 + self.size / 100.0)
     if self.color == (0, 0, 0):
       self.armor_pierce = 1
+
+    self.dps = 1 / self.shot_delay * self.damage
 
     self.stats = []
     self.stats.append("damage: %d + %d" % (size_damage, red_damage))
     self.stats.append("range: %d" % self.range)
+    self.stats.append("freeze %.3f" % self.freeze)
     self.stats.append("attack speed: %.2f" % (1 / self.shot_delay))
+    self.stats.append("DPS: %.2f" % self.dps)
     self.stats.append("")
-    if self.freeze > 0:
-      self.stats.append("cyan: %.3f freeze" % self.freeze)
     if self.armor_decay > 0:
-      self.stats.append("magenta: %.2f armor destruction" % self.armor_decay)
+      self.stats.append("cyan: %.2f armor breaking" % self.armor_decay)
     if self.inflate > 0:
-      self.stats.append("yellow: %d%% inflation" % (self.inflate * 100))
+      self.stats.append("magenta: %d%% inflation" % (self.inflate * 100))
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.stats.append("purity bonus: +2 aspd")
     self.stats.append("")
-    self.stats.append("mass: %d" % self.size)
+    self.stats.append("kills: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
 
   def act(self):
@@ -304,6 +307,11 @@ def keyhandler(key):
     g.logged.clear()
   elif key == ord("n"):
     g.nextwave = 0
+  elif key == ord("d"):
+    if pygame.key.get_mods() & KMOD_SHIFT and g.active:
+      g.towers.remove(g.active)
+      g.active = None
+      g.drag = None
   elif key == ord("b"):
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
@@ -329,13 +337,13 @@ def keyhandler(key):
 
 def key_pressed_handler(pressed):
   if (pressed[ord("j")] or pressed[K_DOWN]) and g.active:
-    g.active.vy += 4.0 * g.active.inertia
+    g.active.vy += 2.0 * g.active.inertia
   if (pressed[ord("k")] or pressed[K_UP]) and g.active:
-    g.active.vy -= 4.0 * g.active.inertia
+    g.active.vy -= 2.0 * g.active.inertia
   if (pressed[ord("h")] or pressed[K_LEFT]) and g.active:
-    g.active.vx -= 4.0 * g.active.inertia
+    g.active.vx -= 2.0 * g.active.inertia
   if (pressed[ord("l")] or pressed[K_RIGHT]) and g.active:
-    g.active.vx += 4.0 * g.active.inertia
+    g.active.vx += 2.0 * g.active.inertia
 
 
 def click(action, pos, button):
