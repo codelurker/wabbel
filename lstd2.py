@@ -164,7 +164,7 @@ class Tower(object):
     self.radius = int(sqrt((50 + self.size) * (1+self.inflate) * pi))
     self.range = int(self.radius + 30 + sqrt(self.blue * 10) * 2)
 
-    self.shot_delay = max(0.1, 0.5 - (1 * self.green / 255.0) + (self.size / 500.0))
+    self.shot_delay = max(0.1, 0.4 - (0.3 * self.green / 255.0) + (self.size / 500.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
     self.inertia = 4.0 / (4 + self.size)
@@ -313,8 +313,7 @@ def keyhandler(key):
     if g.active:
       c = {K_1: "red", K_2: "green", K_3: "blue"}[key]
       if pygame.key.get_mods() & KMOD_SHIFT:
-        if g.hp > 2 and g.active.__dict__[c] > 0:
-          g.hp -= 0.5
+        if g.active.__dict__[c] > 0:
           g.active.__dict__[c] = max(0, g.active.__dict__[c] - 16)
       else:
         if g.hp > 2 and g.active.__dict__[c] < 255:
