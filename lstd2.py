@@ -10,6 +10,20 @@ from collections import deque
 from math import *
 from pygame.locals import *
 
+# -- INDEX --
+# class Globals
+# def run()
+# def draw
+# class Actor
+# class Monster(Actor)
+# class Tower(Actor)
+# class Wave
+# def keypress
+# def keyhold
+# def click
+# def die
+
+
 class Globals(object):
   def __init__(g):
     # constants:
@@ -19,12 +33,11 @@ class Globals(object):
     g.fullscreen = '--fullscreen' in sys.argv
     g.font_name = None
     g.font_size = 16, 24
-    g.gravity = 0.01
     g.nextwavestep = 1
+    g.range_color = (32, 32, 32)
     g.level_layouts = [
         [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)],
     ]
-    g.level = list(_scaled(g.level_layouts[0], g.w, g.h))
     g.clock = None
     g.font = None
     g.smallfont = None
@@ -34,11 +47,13 @@ class Globals(object):
     g.reset()
 
   def reset(g):
+    g.level = list(_scaled(random.choice(g.level_layouts), g.w, g.h))
     g.logged = deque(maxlen=30)
     g.nextwave = 200
     g.nextwavemax = g.nextwave
     g.hp = 10
-    g.hpregeneration = 0.01
+    g.hpregeneration = 0
+    g.hp_per_monster = 0.3
     g.maxhp = g.hp
     g.levelnumber = 0
     g.score = 0
@@ -49,11 +64,178 @@ class Globals(object):
     g.waves = list()
     g.towers = list()
 
+    g.change_level()
+
+  def change_level(g):
+    g.level_color = _random_color(0xff)
+    if g.levelnumber == 0:
+      g.gravity = (0, 0.01)
+    else:
+      g.gravity = (0.001 * random.randint(-200,200),
+          0.001 * random.randint(-200,200))
+
   def log(g, obj):
     g.logged.append(str(obj))
 
 
-class Monster(object):
+def run():
+  pygame.init()
+  pygame.font.init()
+  pygame.key.set_repeat(180, 80)
+  flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
+  if g.fullscreen:
+    flags |= pygame.FULLSCREEN
+  g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
+  g.smallfont = pygame.font.Font(g.font_name, g.font_size[0])
+  g.font = pygame.font.Font(g.font_name, g.font_size[1])
+
+  g.clock = pygame.time.Clock()
+  g.w, g.h = g.screen.get_size()
+  g.log("Welcome! Press F1 to display help.")
+
+  next_log_refresh = 0
+
+  while True:
+    g.clock.tick(g.maxfps)
+    if next_log_refresh <= time.time():
+      next_log_refresh = time.time() + 1
+      g.log("")
+
+    for event in pygame.event.get():
+      if event.type == QUIT:
+        return
+      elif event.type == KEYDOWN:
+        if event.key == K_ESCAPE or event.key == K_q:
+          return
+        elif event.key == K_F11:
+          pygame.display.toggle_fullscreen()
+        else:
+          keypress(event.key)
+      elif event.type in (MOUSEBUTTONDOWN, MOUSEBUTTONUP):
+        click(event.type, event.pos, event.button)
+    keyhold(pygame.key.get_pressed())
+    draw()
+
+
+def draw():
+  if g.hp <= 0:
+    return
+  if g.pause:
+    return
+
+  g.hp = min(g.maxhp, g.hp + g.hpregeneration)
+  if g.towers or g.levelnumber:
+    if g.levelnumber % 10 == 0:
+      if g.mobs:
+        g.nextwave = g.nextwavemax
+      else:
+        g.change_level()
+        g.nextwave = 0
+
+    g.nextwave -= g.nextwavestep
+    if g.nextwave <= 0:
+      g.nextwave = g.nextwavemax
+      g.levelnumber += 1
+      g.log("Level %d" % g.levelnumber)
+      g.waves.append(Wave(g.levelnumber))
+
+  g.screen.fill((0, 0, 0))
+
+  if g.active:
+    pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
+
+  pygame.draw.lines(g.screen, g.level_color, False, g.level, 10)
+  for dot in g.level:
+    pygame.draw.circle(g.screen, g.level_color, dot, 4, 0)
+
+  for wave in list(g.waves):
+    if wave.monsters_left > 0:
+      wave.tick()
+    else:
+      g.waves.remove(wave)
+
+  for mob in list(g.mobs):
+    if mob.hp <= 0:
+      g.mobs.remove(mob)
+    else:
+      mob.draw()
+
+  if g.drag:
+    mouse = pygame.mouse.get_pos()
+    dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
+    dist = sqrt(dx*dx + dy*dy)
+    if dist < g.max_drag_dist:
+      g.drag_to = mouse
+    else:
+      angle = atan2(dy, dx)
+      g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
+                  g.drag.y + g.max_drag_dist * sin(angle)
+
+  g.towers.sort(key=lambda tower: -tower.size)
+  for i, tower in enumerate(list(g.towers)):
+    tower.act()
+    tower.draw()
+    for other in g.towers[i+1:]:
+      angle = atan2(tower.y - other.y, tower.x - other.x)
+      distance = sqrt((tower.y - other.y)**2 + (tower.x - other.x)**2)
+      if distance > 5:
+        attraction = (tower.size + other.size) / 10 / distance
+        tower.vx -= cos(angle) * attraction * tower.inertia
+        tower.vy -= sin(angle) * attraction * tower.inertia
+        other.vx += cos(angle) * attraction * other.inertia
+        other.vy += sin(angle) * attraction * other.inertia
+
+  if g.drag:
+    pygame.draw.line(g.screen, g.drag.color, g.drag.pos, g.drag_to, 3)
+
+  _draw_bar(g.w-120, 15, int(100*g.nextwave/g.nextwavemax), 2, (150, 150, 0))
+  if g.hp > 0:
+    _draw_bar(g.w-120, 10, 100, 3, (100, 100, 100))
+    _draw_bar(g.w-120, 10, int(100*g.hp/g.maxhp), 5, (255, 0, 0))
+
+  if g.active:
+    for y in [30, 35, 40, 50, 55, 60]:
+      _draw_bar(g.w-100, y, 80, 2, (100, 100, 100))
+
+    _draw_bar(g.w-100, 30, int(80*g.active.red/255), 3, (200, 0, 0))
+    _draw_bar(g.w-100, 35, int(80*g.active.green/255), 3, (0, 200, 0))
+    _draw_bar(g.w-100, 40, int(80*g.active.blue/255), 3, (0, 0, 200))
+
+    _draw_bar(g.w-100, 50, int(80*g.active.yellow/255), 3, (200, 200, 0))
+    _draw_bar(g.w-100, 55, int(80*g.active.magenta/255), 3, (200, 0, 200))
+    _draw_bar(g.w-100, 60, int(80*g.active.cyan/255), 3, (0, 200, 200))
+
+    x, y = g.w - 20, 80
+    for line in g.active.stats:
+      text = g.smallfont.render(line, 1, (255, 255, 255))
+      g.screen.blit(text, (x - text.get_rect().width, y))
+      y += text.get_rect().height + 2
+
+  x, y = 0, 0
+  for line in g.logged:
+    if not line:
+      continue
+    text = g.font.render(line, 1, (255, 255, 255))
+    g.screen.blit(text, (x, y))
+    y += text.get_rect().height + 2
+
+  line = "%d %d" % (g.clock.get_fps(), g.score)
+  text = g.font.render(line, 1, (150, 150, 150))
+  g.screen.blit(text, (10, g.h-10-text.get_rect().height))
+
+  pygame.display.flip()
+
+
+class Actor(object):
+  @property
+  def pos(self):
+    return int(self.x), int(self.y)
+
+  def distance(self, x, y):
+    return sqrt((x-self.x) ** 2 + (y-self.y) ** 2)
+
+
+class Monster(Actor):
   def __init__(self, level):
     self.level = level
     self.hp = 10 * level
@@ -98,7 +280,7 @@ class Monster(object):
     if self.square:
       pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
     else:
-      pygame.draw.circle(g.screen, self.color, (int(self.x), int(self.y)), 5, 2)
+      pygame.draw.circle(g.screen, self.color, self.pos, 5, 2)
 
   def damage(self, damage, tower):
     damage -= self.armor * (1 - tower.armor_pierce)
@@ -114,22 +296,7 @@ class Monster(object):
     return False
 
 
-class Wave(object):
-  def __init__(self, level):
-    self.level = level
-    self.delay = 0.3
-    self.last_send = 0
-    self.monsters_left = 10
-
-  def tick(self):
-    if self.last_send + self.delay < time.time():
-      mob = Monster(self.level)
-      g.mobs.append(mob)
-      self.monsters_left -= 1
-      self.last_send = time.time()
-
-
-class Tower(object):
+class Tower(Actor):
   starting_towers = [(64, 0, 0), (0, 64, 0), (0, 0, 64)]
 #  starting_towers = [(64, 64, 0), (64, 0, 64), (0, 64, 64), (128, 0, 0),
 #      (0, 128, 0), (0, 0, 128)]
@@ -144,6 +311,7 @@ class Tower(object):
     self.last_shot = 0
     self.range = 100
     self.phase = 0
+    self.bonus_damage = 0
     self.stats = []
     self.update_stats()
 
@@ -161,8 +329,10 @@ class Tower(object):
     self.armor_decay = sqrt(self.cyan / 2048.0)
     self.freeze = b / 2048.0
     self.armor_pierce = 0
-    self.inflate = (self.magenta / 255.0) ** 4 * 3
-    self.radius = int(sqrt((50 + self.size) * (1+self.inflate) * pi))
+    self.support = 0
+    self.inflate = 0
+#    self.inflate = (self.magenta / 255.0) ** 4 * 3
+    self.radius = int(sqrt((50 + self.size * 1.3) * (1+self.inflate) * pi))
     self.range = int(self.radius + 30 + sqrt(g * 10) * 2)
 
     self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
@@ -172,19 +342,21 @@ class Tower(object):
     if self.color == (0, 0, 0):
       self.armor_pierce = 1
 
-    self.dps = 1 / self.shot_delay * self.damage
+    self.dps = 1 / self.shot_delay * (self.damage + self.bonus_damage)
 
     self.stats = []
-    self.stats.append("damage: %d + %d" % (size_damage, red_damage))
-    self.stats.append("range: %d" % self.range)
-    self.stats.append("freeze %.3f" % self.freeze)
-    self.stats.append("attack speed: %.2f" % (1 / self.shot_delay))
     self.stats.append("DPS: %.2f" % self.dps)
+    self.stats.append("damage: %d + %d + %d" % (size_damage, red_damage, self.bonus_damage))
+    self.stats.append("range: %d" % self.range)
+    self.stats.append("attacks per second: %.2f" % (1 / self.shot_delay))
     self.stats.append("")
+    if self.freeze > 0:
+      self.stats.append("blue: %.3f freeze" % self.freeze)
     if self.armor_decay > 0:
       self.stats.append("cyan: %.2f armor breaking" % self.armor_decay)
-    if self.inflate > 0:
-      self.stats.append("magenta: %d%% inflation" % (self.inflate * 100))
+    if self.magenta > 0:
+      self.support = self.size / 20.0 + self.magenta / 16.0
+      self.stats.append("magenta: adds %d damage to bubbles in range" % self.support)
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
@@ -203,7 +375,8 @@ class Tower(object):
       self.vy += (mousey - self.y) / 20 * self.inertia
     else:
       if self.y + self.radius < g.h:
-        self.vy += g.gravity
+        self.vx += g.gravity[0]
+        self.vy += g.gravity[1]
 
     self.y += self.vy
     self.x += self.vx
@@ -220,6 +393,13 @@ class Tower(object):
     if self.last_shot + self.shot_delay < time.time():
       self.shoot()
 
+    if self.support > 0:
+      for tower in g.towers:
+        if tower != self and self.distance(tower.x, tower.y) < self.range \
+            and tower.bonus_damage < self.support:
+          tower.bonus_damage = self.support
+          tower.update_stats()
+
   def draw(self):
     whalf = (1 + 0.2 *-sin(self.phase+0.2)) * self.radius
     hhalf = (1 + 0.2 * sin(self.phase)) * self.radius
@@ -231,7 +411,6 @@ class Tower(object):
     pygame.draw.ellipse(g.screen, (20, 20, 20), rect, 0)
     rect = Rect(x, y, whalf*2, hhalf*2)
     pygame.draw.ellipse(g.screen, self.color, rect, 0)
-
 
   def _get_monsters_in_range(self):
     for mob in g.mobs:
@@ -247,50 +426,40 @@ class Tower(object):
       return
     self.last_shot = time.time()
     target = max(mobs, key=lambda mob: mob.danger)
-    pygame.draw.circle(g.screen, self.color, (int(target.x), int(target.y)), self.radius, 0)
-    pygame.draw.line(g.screen, self.color, (int(self.x), int(self.y)), (int(target.x), int(target.y)), self.radius)
+    pygame.draw.circle(g.screen, self.color, target.pos, self.radius, 0)
+    pygame.draw.line(g.screen, self.color, self.pos, target.pos, self.radius)
 
     for mob in g.mobs:
       if mob.hp > 0 and \
           abs(mob.x - target.x) < self.radius and \
           abs(mob.y - target.y) < self.radius and \
           sqrt((mob.x - target.x) ** 2 + (mob.y - target.y) ** 2) < self.radius:
-        if mob.damage(self.damage, self):
+        if mob.damage(self.damage + self.bonus_damage, self):
           self.size += 1
           self.update_stats()
+          g.hp = min(g.maxhp, g.hp + g.hp_per_monster)
           g.score += mob.level
+    if self.bonus_damage:
+      self.bonus_damage = 0
+      self.update_stats()
 
 
-# Lib {{{
-def _cached_method(fnc):
-  cache = {}
-  def result(*args):
-    try:
-      return cache[args]
-    except:
-      value = fnc(*args)
-      cache[args] = value
-      return value
-  result._cache = cache
-  return result
+class Wave(object):
+  def __init__(self, level):
+    self.level = level
+    self.delay = 0.3
+    self.last_send = 0
+    self.monsters_left = 10
+
+  def tick(self):
+    if self.last_send + self.delay < time.time():
+      mob = Monster(self.level)
+      g.mobs.append(mob)
+      self.monsters_left -= 1
+      self.last_send = time.time()
 
 
-def _scaled(dots, width, height):
-  for dot in dots:
-    yield (int(dot[0] * width), int(dot[1] * height))
-
-def _scale_color(color, factor):
-  return (max(0, min(255, int(color[0] * factor))),
-      max(0, min(255, int(color[1] * factor))),
-      max(0, min(255, int(color[2] * factor))))
-
-def _draw_bar(x, y, length, width, color):
-  if length > 0:
-    pygame.draw.line(g.screen, color, (x, y), (x + length, y), width)
-#}}}
-
-
-def keyhandler(key):
+def keypress(key):
   if key == K_F1:
     g.log("Space: Pause game")
     g.log("b: Create a new bubble")
@@ -335,7 +504,7 @@ def keyhandler(key):
       g.active = g.towers[0]
 
 
-def key_pressed_handler(pressed):
+def keyhold(pressed):
   if (pressed[ord("j")] or pressed[K_DOWN]) and g.active:
     g.active.vy += 2.0 * g.active.inertia
   if (pressed[ord("k")] or pressed[K_UP]) and g.active:
@@ -378,150 +547,30 @@ def die():
     g.log("Final Score: %d" % g.score)
 
 
-def draw():
-  if g.hp <= 0:
-    return
-  if g.pause:
-    return
+# Lib {{{
+def _scaled(dots, width, height):
+  for dot in dots:
+    yield (int(dot[0] * width), int(dot[1] * height))
 
-  g.hp = min(g.maxhp, g.hp + g.hpregeneration)
-  if g.towers or g.levelnumber:
-#    if g.levelnumber % 20 == 0:
+def _scale_color(color, factor):
+  return (max(0, min(255, int(color[0] * factor))),
+      max(0, min(255, int(color[1] * factor))),
+      max(0, min(255, int(color[2] * factor))))
 
-    g.nextwave -= g.nextwavestep
-    if g.nextwave <= 0:
-      g.nextwave = g.nextwavemax
-      g.levelnumber += 1
-      g.log("Level %d" % g.levelnumber)
-      g.waves.append(Wave(g.levelnumber))
+def _draw_bar(x, y, length, width, color):
+  if length > 0:
+    pygame.draw.line(g.screen, color, (x, y), (x + length, y), width)
 
-  g.screen.fill((0, 0, 0))
-
-  if g.active:
-    pygame.draw.circle(g.screen, (32, 32, 32), (int(g.active.x),
-      int(g.active.y)), g.active.range, 0)
-
-  pygame.draw.lines(g.screen, (100, 0, 0), False, g.level, 10)
-  for dot in g.level:
-    pygame.draw.circle(g.screen, (100, 0, 0), dot, 4, 0)
-
-  for wave in list(g.waves):
-    if wave.monsters_left > 0:
-      wave.tick()
-    else:
-      g.waves.remove(wave)
-
-  for mob in list(g.mobs):
-    if mob.hp <= 0:
-      g.mobs.remove(mob)
-    else:
-      mob.draw()
-
-  if g.drag:
-    mouse = pygame.mouse.get_pos()
-    dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
-    dist = sqrt(dx*dx + dy*dy)
-    if dist < g.max_drag_dist:
-      g.drag_to = mouse
-    else:
-      angle = atan2(dy, dx)
-      g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
-                  g.drag.y + g.max_drag_dist * sin(angle)
-
-  g.towers.sort(key=lambda tower: -tower.size)
-  for i, tower in enumerate(list(g.towers)):
-    tower.act()
-    tower.draw()
-    for other in g.towers[i+1:]:
-      angle = atan2(tower.y - other.y, tower.x - other.x)
-      distance = sqrt((tower.y - other.y)**2 + (tower.x - other.x)**2)
-      if distance > 5:
-        attraction = (tower.size + other.size) / 10 / distance
-        tower.vx -= cos(angle) * attraction * tower.inertia
-        tower.vy -= sin(angle) * attraction * tower.inertia
-        other.vx += cos(angle) * attraction * other.inertia
-        other.vy += sin(angle) * attraction * other.inertia
-
-  if g.drag:
-    pygame.draw.line(g.screen, g.drag.color, (int(g.drag.x), int(g.drag.y)),
-        g.drag_to, 3)
-
-  _draw_bar(g.w-120, 15, int(100*g.nextwave/g.nextwavemax), 2, (150, 150, 0))
-  if g.hp > 0:
-    _draw_bar(g.w-120, 10, 100, 3, (100, 100, 100))
-    _draw_bar(g.w-120, 10, int(100*g.hp/g.maxhp), 5, (255, 0, 0))
-
-  if g.active:
-    for y in [30, 35, 40, 50, 55, 60]:
-      _draw_bar(g.w-100, y, 80, 2, (100, 100, 100))
-
-    _draw_bar(g.w-100, 30, int(80*g.active.red/255), 3, (200, 0, 0))
-    _draw_bar(g.w-100, 35, int(80*g.active.green/255), 3, (0, 200, 0))
-    _draw_bar(g.w-100, 40, int(80*g.active.blue/255), 3, (0, 0, 200))
-
-    _draw_bar(g.w-100, 50, int(80*g.active.yellow/255), 3, (200, 200, 0))
-    _draw_bar(g.w-100, 55, int(80*g.active.magenta/255), 3, (200, 0, 200))
-    _draw_bar(g.w-100, 60, int(80*g.active.cyan/255), 3, (0, 200, 200))
-
-    x, y = g.w - 20, 80
-    for line in g.active.stats:
-      text = g.smallfont.render(line, 1, (255, 255, 255))
-      g.screen.blit(text, (x - text.get_rect().width, y))
-      y += text.get_rect().height + 2
-
-  x, y = 0, 0
-  for line in g.logged:
-    if not line:
-      continue
-    text = g.font.render(line, 1, (255, 255, 255))
-    g.screen.blit(text, (x, y))
-    y += text.get_rect().height + 2
-
-  line = "%d %d" % (g.clock.get_fps(), g.score)
-  text = g.font.render(line, 1, (150, 150, 150))
-  g.screen.blit(text, (10, g.h-10-text.get_rect().height))
-
-  pygame.display.flip()
-
-
-def run():
-  pygame.init()
-  pygame.font.init()
-  pygame.key.set_repeat(180, 80)
-  flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
-  if g.fullscreen:
-    flags |= pygame.FULLSCREEN
-  g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
-  g.smallfont = pygame.font.Font(g.font_name, g.font_size[0])
-  g.font = pygame.font.Font(g.font_name, g.font_size[1])
-
-  g.clock = pygame.time.Clock()
-  g.w, g.h = g.screen.get_size()
-  g.log("Welcome! Press F1 to display help.")
-
-  next_log_refresh = 0
-
-  while True:
-    g.clock.tick(g.maxfps)
-    if next_log_refresh <= time.time():
-      next_log_refresh = time.time() + 1
-      g.log("")
-
-    for event in pygame.event.get():
-      if event.type == QUIT:
-        return
-      elif event.type == KEYDOWN:
-        if event.key == K_ESCAPE or event.key == K_q:
-          return
-        elif event.key == K_F11:
-          pygame.display.toggle_fullscreen()
-        else:
-          keyhandler(event.key)
-      elif event.type in (MOUSEBUTTONDOWN, MOUSEBUTTONUP):
-        click(event.type, event.pos, event.button)
-    key_pressed_handler(pygame.key.get_pressed())
-    draw()
-
+def _random_color(maximum):
+  color = [0, 0, 0]
+  for i in range(min(3*255, maximum)):
+    random.shuffle(color)
+    for n in range(3):
+      if color[n] < 255:
+        color[n] += 1
+        break
+  return color
+#}}}
 
 if __name__ == '__main__':
   global g
