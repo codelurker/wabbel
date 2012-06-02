@@ -17,29 +17,31 @@ class Globals(object):
     g.w, g.h = 800, 600
     g.profile = '--profile' in sys.argv
     g.fullscreen = '--fullscreen' in sys.argv
-    g.logged = deque(maxlen=30)
-#    g.font_name = None
     g.font_name = None
     g.font_size = 24
     g.gravity = 0.01
-    g.hp = 10
-    g.nextwave = 200
     g.nextwavestep = 1
-    g.nextwavemax = g.nextwave
-    g.maxhp = g.hp
-    g.levelnumber = 0
     g.level = [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)]
     g.level_scaled = list(_scaled(g.level, g.w, g.h))
+    g.clock = None
+    g.font = None
 
-    # overridden later:
+    g.reset()
+
+  def reset(g):
+    g.logged = deque(maxlen=30)
+    g.nextwave = 200
+    g.nextwavemax = g.nextwave
+    g.hp = 10
+    g.maxhp = g.hp
+    g.levelnumber = 0
+    g.score = 0
     g.pause = False
     g.drag = None
     g.active = None
     g.mobs = []
     g.waves = list()
     g.towers = list()
-    g.font = None
-    g.clock = None
 
   def log(g, obj):
     g.logged.append(str(obj))
@@ -49,12 +51,20 @@ class Monster(object):
   def __init__(self, level):
     self.level = level
     self.hp = 10 * level
-    self.maxhp = self.hp
     self.checkpoint = 0
-    self.speed = 1 + level * 0.1
+    self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
     self.danger = 0
+    self.armor = 0
+    self.original_color = (random.randint(1,3) * 63, random.randint(1,3) * 63, random.randint(1,3) * 63)
+    self.color = self.original_color
     self.x, self.y = g.level_scaled[self.checkpoint]
-#    g.log("sent a level %d monster at (%d, %d)" % (self.level, self.x, self.y))
+    if level % 3 == 0:
+      self.square = True
+      self.armor = (self.armor + 1) * 2
+      self.hp *= 0.5
+    else:
+      self.square = False
+    self.maxhp = float(self.hp)
 
   def draw(self):
     point1 = g.level_scaled[self.checkpoint]
@@ -69,11 +79,22 @@ class Monster(object):
         self.hp = 0
         g.hp -= 1
         if g.hp <= 0:
-          g.log("Game over!")
+          g.log("You have lost the game! Press F10 to reset. Final Score: %d" % g.score)
       else:
         self.checkpoint += 1
 
-    pygame.draw.circle(g.screen, (0, int(255 * self.hp / self.maxhp), 0), (int(self.x), int(self.y)), 5, 2)
+    if self.square:
+      pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
+    else:
+      pygame.draw.circle(g.screen, self.color, (int(self.x), int(self.y)), 5, 2)
+
+  def damage(self, damage):
+    damage -= self.armor
+    self.hp -= damage
+    self.color = _scale_color(self.color, self.hp / self.maxhp)
+    if self.hp < 0 and -self.hp <= damage:
+      return True
+    return False
 
 
 class Wave(object):
@@ -93,16 +114,16 @@ class Wave(object):
 
 class Tower(object):
   def __init__(self):
-    self.red = 32
-    self.blue = 32
-    self.green = 32
+    self.red = 64
+    self.blue = 64
+    self.green = 64
     color = random.randint(1,3)
     if color == 1:
-      self.red += 64
+      self.red = 0
     elif color == 2:
-      self.green += 64
+      self.green = 0
     else:
-      self.blue += 64
+      self.blue = 0
     self.size = 0
     self.x = g.w
     self.y = g.h * 0.5
@@ -178,10 +199,10 @@ class Tower(object):
           abs(mob.x - target.x) < self.radius and \
           abs(mob.y - target.y) < self.radius and \
           sqrt((mob.x - target.x) ** 2 + (mob.y - target.y) ** 2) < self.radius:
-        mob.hp -= self.damage
-        if mob.hp < 0 and -mob.hp <= self.damage:
+        if mob.damage(self.damage):
           self.size += 1
           self.update_stats()
+          g.score += mob.level
 
 
 # Lib {{{
@@ -201,6 +222,11 @@ def _cached_method(fnc):
 def _scaled(dots, width, height):
   for dot in dots:
     yield (int(dot[0] * width), int(dot[1] * height))
+
+def _scale_color(color, factor):
+  return (max(0, min(255, int(color[0] * factor))),
+      max(0, min(255, int(color[1] * factor))),
+      max(0, min(255, int(color[2] * factor))))
 
 def _draw_bar(x, y, length, width, color):
   pygame.draw.line(g.screen, color, (x, y), (x + length, y), width)
@@ -225,6 +251,8 @@ def keyhandler(key):
     g.log("f: Send the next wave of enemies")
     g.log("Drag&Drop, Arrow Keys or hjkl: Move the active bubble")
     g.log("q or ESC: quit")
+  elif key == K_F10:
+    g.reset()
   elif key == ord("c"):
     g.logged.clear()
   elif key == ord("f"):
@@ -275,8 +303,12 @@ def click(action, pos, button):
           g.drag = tower
           g.active = tower
           break
+      else:
+        g.active = None
     elif action == MOUSEBUTTONUP:
       g.drag = None
+  elif button == 3:
+    g.active = None
 
 
 def draw():
@@ -337,6 +369,10 @@ def draw():
     text = g.font.render(line, 1, (255, 255, 255))
     g.screen.blit(text, (x, y))
     y += text.get_rect().height + 2
+
+  line = "%d %d" % (g.clock.get_fps(), g.score)
+  text = g.font.render(line, 1, (150, 150, 150))
+  g.screen.blit(text, (10, g.h-10-text.get_rect().height))
 
   pygame.display.flip()
 
