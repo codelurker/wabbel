@@ -45,10 +45,11 @@ class Globals(object):
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
     g.hp_cost = 1
+    g.drag_to = None
     g.hp_damage = 0.6
     g.monster_min_speed = 0.3
     g.monster_min_armor = 0.5
-    g.min_hp_for_buying = 5
+    g.min_hp_for_buying = 2
     g.color_step = 10
     g.clock = None
     g.font = None
@@ -170,6 +171,17 @@ def draw():
       else:
         mob.walk()
 
+    if g.drag:
+      mouse = pygame.mouse.get_pos()
+      dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
+      dist = sqrt(dx*dx + dy*dy)
+      if dist < g.max_drag_dist:
+        g.drag_to = mouse
+      else:
+        angle = atan2(dy, dx)
+        g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
+                    g.drag.y + g.max_drag_dist * sin(angle)
+
     g.towers.sort(key=lambda tower: -tower.size)
     for i, tower in enumerate(tuple(g.towers)):
       tower.walk()
@@ -199,21 +211,10 @@ def draw():
   for mob in g.mobs:
     mob.draw()
 
-  if g.drag:
-    mouse = pygame.mouse.get_pos()
-    dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
-    dist = sqrt(dx*dx + dy*dy)
-    if dist < g.max_drag_dist:
-      g.drag_to = mouse
-    else:
-      angle = atan2(dy, dx)
-      g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
-                  g.drag.y + g.max_drag_dist * sin(angle)
-
   for tower in tuple(g.towers):
     tower.draw()
 
-  if g.drag:
+  if g.drag and g.drag_to:
     pygame.draw.line(g.screen, g.drag.color, g.drag.pos, g.drag_to, 3)
 
   _draw_bar(g.w-120, 15, int(100*g.nextwave/g.nextwavemax), 2, (150, 150, 0))
@@ -266,11 +267,11 @@ class Actor(object):
 class Monster(Actor):
   def __init__(self, level):
     self.level = level
-    self.hp = 10 * level
+    self.hp = 6 * level
     self.checkpoint = 0
     self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
     self.danger = 0
-    self.armor = max(0, (level - 5) * 0.2)
+    self.armor = max(0, (level - 5))
     self.color = (random.randint(1,3) * 63, random.randint(1,3) * 63,
         random.randint(1,3) * 63)
     self.x, self.y = g.checkpoints[self.checkpoint]
@@ -346,6 +347,7 @@ class Tower(Actor):
     self.phase = 0
     self.bonus_damage = 0
     self.stats = []
+    self.target_point = None
     self.update_stats()
 
   def update_stats(self):
@@ -439,6 +441,10 @@ class Tower(Actor):
     pygame.draw.ellipse(g.screen, (20, 20, 20), rect, 0)
     rect = Rect(x, y, whalf*2, hhalf*2)
     pygame.draw.ellipse(g.screen, self.color, rect, 0)
+    if self.target_point:
+      pygame.draw.circle(g.screen, self.color, self.target_point, self.radius, 0)
+      pygame.draw.line(g.screen, self.color, self.pos, self.target_point, self.radius)
+      self.target_point = None
 
   def _get_monsters_in_range(self):
     for mob in g.mobs:
@@ -454,8 +460,8 @@ class Tower(Actor):
       return
     self.last_shot = time.time()
     target = max(mobs, key=lambda mob: mob.danger)
-    pygame.draw.circle(g.screen, self.color, target.pos, self.radius, 0)
-    pygame.draw.line(g.screen, self.color, self.pos, target.pos, self.radius)
+
+    self.target_point = target.pos
 
     for mob in g.mobs:
       if mob.hp > 0 and \
@@ -509,6 +515,7 @@ q or ESC: quit""".split("\n"))
       g.towers.remove(g.active)
       g.active = None
       g.drag = None
+      g.drag_to = None
   elif key == ord("b"):
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
@@ -550,11 +557,13 @@ def click(action, pos, button):
         if tower.distance(pos[0], pos[1]) <= tower.radius:
           g.drag = tower
           g.active = tower
+          g.drag_to = None
           break
       else:
         g.active = None
     elif action == MOUSEBUTTONUP:
       g.drag = None
+      g.drag_to = None
   elif button == 3:
     g.active = None
 
