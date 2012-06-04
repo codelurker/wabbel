@@ -45,8 +45,7 @@ class Globals(object):
     ]
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
-    g.hp_cost = 1
-    g.drag_to = None
+    g.hp_cost = 0 if g.debug else 1
     g.hp_damage = 0 if g.debug else 0.6
     g.monster_min_speed = 0.3
     g.monster_min_armor = 0.5
@@ -64,7 +63,8 @@ class Globals(object):
     Variables that are initialized here are changed continuously in the course
     of the game and are reset to their defaults when a new game is started.
     """
-    g.checkpoints = list(_scaled(random.choice(g.level_layouts), g.w, g.h))
+    g.checkpoints = [(int(d[0] * g.w), int(d[1] * g.h)) for d in
+        random.choice(g.level_layouts)]
     g.logged = deque(maxlen=30)
     g.nextwave = 200
     g.nextwavemax = g.nextwave
@@ -173,17 +173,6 @@ def draw():
         mob.walk()
 
   if g.hp > 0 and not g.pause or g.debug:
-    if g.drag:
-      mouse = pygame.mouse.get_pos()
-      dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
-      dist = sqrt(dx*dx + dy*dy)
-      if dist < g.max_drag_dist:
-        g.drag_to = mouse
-      else:
-        angle = atan2(dy, dx)
-        g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
-                    g.drag.y + g.max_drag_dist * sin(angle)
-
     g.towers.sort(key=lambda tower: -tower.size)
     for i, tower in enumerate(tuple(g.towers)):
       tower.walk()
@@ -218,8 +207,8 @@ def draw():
   for tower in tuple(g.towers):
     tower.draw()
 
-  if g.drag and g.drag_to:
-    pygame.draw.line(g.screen, g.drag.color, g.drag.pos, g.drag_to, 3)
+  if g.drag:
+    pygame.draw.line(g.screen, g.drag.color, g.drag.pos, pygame.mouse.get_pos(), 3)
 
   _draw_bar(g.w-120, 15, int(100*g.nextwave/g.nextwavemax), 2, (150, 150, 0))
   if g.hp > 0:
@@ -406,8 +395,16 @@ class Tower(Actor):
 
   def walk(self):
     if g.drag == self:
-      self.vx += (g.drag_to[0] - self.x) / 30 * self.inertia
-      self.vy += (g.drag_to[1] - self.y) / 30 * self.inertia
+      mouse = pygame.mouse.get_pos()
+      if self.distance(mouse[0], mouse[1]) < g.max_drag_dist:
+        xtarget, ytarget = mouse
+      else:
+        # limit the ability to pull on a bubble
+        angle = atan2(mouse[1] - self.y, mouse[0] - self.x)
+        xtarget = self.x + g.max_drag_dist * cos(angle)
+        ytarget = self.y + g.max_drag_dist * sin(angle)
+      self.vx += (xtarget - self.x) / 30 * self.inertia
+      self.vy += (ytarget - self.y) / 30 * self.inertia
     else:
       if self.y + self.radius < g.h:
         self.vx += g.gravity[0]
@@ -423,10 +420,6 @@ class Tower(Actor):
 
     self.vx *= 0.97
     self.vy *= 0.97
-#    if self.size < 50:
-#      slowdown = 0.95 + self.size / 1000.0
-#      self.vx *= slowdown
-#      self.vy *= slowdown
 
     if self.last_shot + self.shot_delay < time.time():
       self.shoot()
@@ -521,7 +514,6 @@ q or ESC: quit""".split("\n"))
       g.towers.remove(g.active)
       g.active = None
       g.drag = None
-      g.drag_to = None
   elif key == ord("b"):
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
@@ -563,21 +555,15 @@ def click(action, pos, button):
         if tower.distance(pos[0], pos[1]) <= tower.radius:
           g.drag = tower
           g.active = tower
-          g.drag_to = None
           break
       else:
         g.active = None
     elif action == MOUSEBUTTONUP:
       g.drag = None
-      g.drag_to = None
   elif button == 3:
     g.active = None
 
 # Lib {{{
-def _scaled(dots, width, height):
-  for dot in dots:
-    yield (int(dot[0] * width), int(dot[1] * height))
-
 def _scale_color(color, factor):
   return (max(0, min(255, int(color[0] * factor))),
       max(0, min(255, int(color[1] * factor))),
