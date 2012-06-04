@@ -42,6 +42,11 @@ class Globals(object):
     g.level_layouts = [
         [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)],
     ]
+    g.hpregeneration = 0
+    g.hp_per_monster = 0.3
+    g.hp_cost = 1
+    g.min_hp_for_buying = 5
+    g.color_step = 10
     g.clock = None
     g.font = None
     g.smallfont = None
@@ -54,15 +59,13 @@ class Globals(object):
     Variables that are initialized here are changed continuously in the course
     of the game and are reset to their defaults when a new game is started.
     """
-    g.level = list(_scaled(random.choice(g.level_layouts), g.w, g.h))
+    g.checkpoints = list(_scaled(random.choice(g.level_layouts), g.w, g.h))
     g.logged = deque(maxlen=30)
     g.nextwave = 200
     g.nextwavemax = g.nextwave
     g.hp = 10
-    g.hpregeneration = 0
-    g.hp_per_monster = 0.3
     g.maxhp = g.hp
-    g.levelnumber = 0
+    g.level = 0
     g.score = 0
     g.pause = False
     g.drag = None
@@ -78,11 +81,12 @@ class Globals(object):
     changed, which occurs every g.waves_per_level waves.
     """
     g.level_color = _random_color(0xff)
-    if g.levelnumber == 0:
+    if g.level == 0:
       g.gravity = (0, 0.01)
     else:
-      g.gravity = (0.001 * random.randint(-200,200),
-          0.001 * random.randint(-200,200))
+      grav = min(100, g.level * 3)
+      g.gravity = (0.001 * random.randint(-grav,grav),
+          0.001 * random.randint(-grav,grav))
 
   def log(g, obj):
     g.logged.append(str(obj))
@@ -135,8 +139,8 @@ def draw():
     return
 
   g.hp = min(g.maxhp, g.hp + g.hpregeneration)
-  if g.towers or g.levelnumber:
-    if g.levelnumber and g.levelnumber % g.waves_per_level == 0:
+  if g.towers or g.level:
+    if g.level and g.level % g.waves_per_level == 0:
       if g.mobs:
         g.nextwave = g.nextwavemax
       else:
@@ -146,18 +150,22 @@ def draw():
     g.nextwave -= g.nextwavestep
     if g.nextwave <= 0:
       g.nextwave = g.nextwavemax
-      g.levelnumber += 1
-      g.log("Wave %d" % g.levelnumber)
-      g.waves.append(Wave(g.levelnumber))
+      g.level += 1
+      g.log("Wave %d" % g.level)
+      g.waves.append(Wave(g.level))
 
   g.screen.fill((0, 0, 0))
 
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
 
-  pygame.draw.lines(g.screen, g.level_color, False, g.level, 10)
-  for dot in g.level:
-    pygame.draw.circle(g.screen, g.level_color, dot, 4, 0)
+  dark = [int(clr*0.5) for clr in g.level_color]
+  pygame.draw.lines(g.screen, dark, False, g.checkpoints, 24)
+  for dot in g.checkpoints:
+    pygame.draw.circle(g.screen, dark, (dot[0], dot[1]+1), 12, 0)
+  pygame.draw.lines(g.screen, g.level_color, False, g.checkpoints, 20)
+  for dot in g.checkpoints:
+    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1]+1), 10, 0)
 
   for wave in list(g.waves):
     if wave.monsters_left > 0:
@@ -256,7 +264,7 @@ class Monster(Actor):
     self.armor = max(0, (level - 5) * 0.2)
     self.color = (random.randint(1,3) * 63, random.randint(1,3) * 63,
         random.randint(1,3) * 63)
-    self.x, self.y = g.level[self.checkpoint]
+    self.x, self.y = g.checkpoints[self.checkpoint]
     if level % 3 == 0:
       self.square = True
       self.armor = (self.armor + 1) * 2
@@ -271,15 +279,15 @@ class Monster(Actor):
     self.original_armor = self.armor
 
   def draw(self):
-    point1 = g.level[self.checkpoint]
-    point2 = g.level[self.checkpoint + 1]
+    point1 = g.checkpoints[self.checkpoint]
+    point2 = g.checkpoints[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
     self.x += cos(angle) * self.speed
     self.y += sin(angle) * self.speed
     self.danger += self.speed
     if abs(point2[0] - self.x) < self.speed and \
         abs(point2[1] - self.y) < self.speed * 2:
-      if self.checkpoint >= len(g.level) - 2:
+      if self.checkpoint >= len(g.checkpoints) - 2:
         self.hp = 0
         g.hp -= 1
         if g.hp <= 0:
@@ -287,7 +295,7 @@ class Monster(Actor):
           g.log("Final Score: %d" % g.score)
       else:
         self.checkpoint += 1
-        self.x, self.y = g.level[self.checkpoint]
+        self.x, self.y = g.checkpoints[self.checkpoint]
 
     if self.square:
       pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
@@ -310,10 +318,11 @@ class Monster(Actor):
 
 class Tower(Actor):
   starting_towers = [(64, 0, 0), (0, 64, 0), (0, 0, 64)]
-#  starting_towers = [(64, 64, 0), (64, 0, 64), (0, 64, 64), (128, 0, 0),
-#      (0, 128, 0), (0, 0, 128)]
   def __init__(self):
-    self.color = random.choice(self.starting_towers)
+    if g.towers:
+      self.color = random.choice(self.starting_towers)
+    else:
+      self.color = self.starting_towers[0]
     self.red, self.green, self.blue = self.color
     self.size = 1
     self.x = g.w
@@ -379,12 +388,8 @@ class Tower(Actor):
 
   def act(self):
     if g.drag == self:
-      mousex, mousey = pygame.mouse.get_pos()
-      mousex = max(0, min(g.w, mousex))
-      mousey = max(0, min(g.h, mousey))
-#      g.log("%d, %d" % (mousex, mousey))
-      self.vx += (mousex - self.x) / 20 * self.inertia
-      self.vy += (mousey - self.y) / 20 * self.inertia
+      self.vx += (g.drag_to[0] - self.x) / 30 * self.inertia
+      self.vy += (g.drag_to[1] - self.y) / 30 * self.inertia
     else:
       if self.y + self.radius < g.h:
         self.vx += g.gravity[0]
@@ -503,11 +508,11 @@ def keypress(key):
       c = {K_1: "red", K_2: "green", K_3: "blue"}[key]
       if pygame.key.get_mods() & KMOD_SHIFT:
         if g.active.__dict__[c] > 0:
-          g.active.__dict__[c] = max(0, g.active.__dict__[c] - 16)
+          g.active.__dict__[c] = max(0, g.active.__dict__[c] - g.color_step)
       else:
-        if g.hp > 2 and g.active.__dict__[c] < 255:
-          g.hp -= 1
-          g.active.__dict__[c] = min(255, g.active.__dict__[c] + 16)
+        if g.hp >= g.min_hp_for_buying and g.active.__dict__[c] < 255:
+          g.hp -= g.hp_cost
+          g.active.__dict__[c] = min(255, g.active.__dict__[c] + g.color_step)
       g.active.update_stats()
   elif key == K_TAB:
     if g.active:
@@ -518,13 +523,13 @@ def keypress(key):
 
 def keyhold(pressed):
   if (pressed[ord("j")] or pressed[K_DOWN]) and g.active:
-    g.active.vy += 2.0 * g.active.inertia
+    g.active.vy += 1.0 * g.active.inertia
   if (pressed[ord("k")] or pressed[K_UP]) and g.active:
-    g.active.vy -= 2.0 * g.active.inertia
+    g.active.vy -= 1.0 * g.active.inertia
   if (pressed[ord("h")] or pressed[K_LEFT]) and g.active:
-    g.active.vx -= 2.0 * g.active.inertia
+    g.active.vx -= 1.0 * g.active.inertia
   if (pressed[ord("l")] or pressed[K_RIGHT]) and g.active:
-    g.active.vx += 2.0 * g.active.inertia
+    g.active.vx += 1.0 * g.active.inertia
 
 
 def click(action, pos, button):
