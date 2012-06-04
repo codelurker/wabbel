@@ -1,0 +1,79 @@
+== Dependencies ==
+* Python 2.6 or 2.7
+* pygame
+
+
+== Key Bindings ==
+--------+-----------------------------------------------------------
+b       | Create a new bubble
+D       | Destroy the active bubble
+n       | Send the next wave of monsters
+Tab     | Select the next bubble (in order of size)
+--------+-----------------------------------------------------------
+1       | Paint the bubble in red
+2       | Paint the bubble in green
+3       | Paint the bubble in blue
+Shift+1 | Remove red color from the bubble
+Shift+2 | Remove green color from the bubble
+Shift+3 | Remove blue color from the bubble
+--------+-----------------------------------------------------------
+F1      | Display Help
+Space   | Pause the game
+q,Esc   | End the game
+c       | Clear the message log
+--------+-----------------------------+-----------------------------
+Drag and Drop, Arrow Keys or h/j/k/l  | Move the active bubble
+--------------------------------------+-----------------------------
+
+
+== Rules ==
+
+Create bubbles to fight the monsters that try to reach the end of the track.
+Each time a bubble kills a monster, it gains mass and size.  This has several
+impacts:
+
+* Massive bubbles will attract other bubbles
+* Large bubbles have a stronger attack
+* Since the splash radius of their attacks is equal to their size, large
+  bubbles will hit more monsters with each attack.
+* When you loose all your lives, large bubbles will pop and give you lives
+  in return
+* Massive bubbles will attack slightly slower
+
+You can paint each bubble with a color by adding or removing the primary colors:
+Red, Green and Blue.  Each color endows the bubble with certain properties, as
+described in the next section.
+
+
+== Colors ==
+
+* Red color increases the damage of the bubble.
+* Green color increases the range.
+* Blue color adds a freeze effect to every shot which slows monsters
+  permanently, down to a minimum of 50% of their original speed.
+
+You can mix two colors and leave out the third color for a bonus effect:
+
+* Yellow (red + green) increases the attack speed of the bubble
+* Cyan (green + blue) adds an armor damaging effect to each shot, which reduces
+  the armor of the monster by a given amount.
+* Purple (blue + red) adds a supportive effect that increases the damage of
+  each bubble in the range.
+
+Note that a yellow bubble will lose yellowness if you add blue, so you can't
+have one bubble with all the bonuses.
+
+There are some bonus effects which you get for specific color mixtures:
+* If your secondary colors (yellow, cyan, purple) are all zero, you get a
+  purity bonus of +2 attacks per second.
+* If your primary colors (red, green, blue) are all zero, you get a black hole
+  bonus of 100% armor penetration.
+
+
+== Monsters ==
+
+Monsters gain in strength after each level.  This means that they get faster,
+gain more hit points and get stronger armor.  Every three levels, a tough kind
+of monster will appear which has twice the armor rating but half the hit points.
+
+The score that you get for killing a monster is equal to its level.
