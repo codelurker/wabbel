@@ -1,4 +1,4 @@
-#!/usr/bin/python2 -O
+#!/usr/bin/python2 -OOBts
 # Copyright (C) 2011, 2012  Roman Zimbelmann <hut@lavabit.com>
 # This software is distributed under the terms of the GNU GPL version 3.
 
