@@ -34,6 +34,7 @@ class Globals(object):
     g.w, g.h = 800, 600
     g.profile = '--profile' in sys.argv
     g.fullscreen = '--fullscreen' in sys.argv
+    g.debug = '--debug' in sys.argv
     g.font_name = None
     g.font_size = 16, 24
     g.nextwavestep = 1
@@ -46,7 +47,7 @@ class Globals(object):
     g.hp_per_monster = 0.3
     g.hp_cost = 1
     g.drag_to = None
-    g.hp_damage = 0.6
+    g.hp_damage = 0 if g.debug else 0.6
     g.monster_min_speed = 0.3
     g.monster_min_armor = 0.5
     g.min_hp_for_buying = 2
@@ -171,6 +172,7 @@ def draw():
       else:
         mob.walk()
 
+  if g.hp > 0 and not g.pause or g.debug:
     if g.drag:
       mouse = pygame.mouse.get_pos()
       dx, dy = mouse[0] - g.drag.x, mouse[1] - g.drag.y
@@ -188,12 +190,14 @@ def draw():
       for other in g.towers[i+1:]:
         angle = atan2(tower.y - other.y, tower.x - other.x)
         distance = tower.distance(other.x, other.y)
-        if distance > 5:
-          attraction = (tower.size * other.size) / 10 / distance
-          tower.vx -= cos(angle) * attraction / (tower.size + 1)
-          tower.vy -= sin(angle) * attraction / (tower.size + 1)
-          other.vx += cos(angle) * attraction / (other.size + 1)
-          other.vy += sin(angle) * attraction / (other.size + 1)
+        if distance > 10:
+          g1 = tower.size + 1
+          g2 = other.size + 1
+          attraction = (g1 * g2) / distance**2
+          tower.vx -= cos(angle) * attraction / g1
+          tower.vy -= sin(angle) * attraction / g1
+          other.vx += cos(angle) * attraction / g2
+          other.vy += sin(angle) * attraction / g2
 
   g.screen.fill((0, 0, 0))
 
@@ -271,7 +275,7 @@ class Monster(Actor):
     self.checkpoint = 0
     self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
     self.danger = 0
-    self.armor = max(0, (level - 5))
+    self.armor = max(0, (level - 5)/2)
     self.color = (random.randint(1,3) * 63, random.randint(1,3) * 63,
         random.randint(1,3) * 63)
     self.x, self.y = g.checkpoints[self.checkpoint]
@@ -417,10 +421,12 @@ class Tower(Actor):
     if self.y - self.radius < 0 or self.y + self.radius > g.h:
       self.vy *= -1
 
-    if self.size < 50:
-      slowdown = 0.95 + self.size / 1000.0
-      self.vx *= slowdown
-      self.vy *= slowdown
+    self.vx *= 0.97
+    self.vy *= 0.97
+#    if self.size < 50:
+#      slowdown = 0.95 + self.size / 1000.0
+#      self.vx *= slowdown
+#      self.vy *= slowdown
 
     if self.last_shot + self.shot_delay < time.time():
       self.shoot()
