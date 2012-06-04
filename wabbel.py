@@ -546,13 +546,13 @@ q or ESC: quit""".split("\n"))
 
 
 def keyhold(pressed):
-  if (pressed[ord("j")] or pressed[K_DOWN]) and g.active:
+  if (pressed[K_j] or pressed[K_s] or pressed[K_DOWN]) and g.active:
     g.active.vy += 1.0 * g.active.inertia
-  if (pressed[ord("k")] or pressed[K_UP]) and g.active:
+  if (pressed[K_k] or pressed[K_w] or pressed[K_UP]) and g.active:
     g.active.vy -= 1.0 * g.active.inertia
-  if (pressed[ord("h")] or pressed[K_LEFT]) and g.active:
+  if (pressed[K_h] or pressed[K_a] or pressed[K_LEFT]) and g.active:
     g.active.vx -= 1.0 * g.active.inertia
-  if (pressed[ord("l")] or pressed[K_RIGHT]) and g.active:
+  if (pressed[K_l] or pressed[K_d] or pressed[K_RIGHT]) and g.active:
     g.active.vx += 1.0 * g.active.inertia
 
 

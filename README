@@ -24,7 +24,7 @@ Space   | Pause the game
 q,Esc   | End the game
 c       | Clear the message log
 --------+-----------------------------+-----------------------------
-Drag and Drop, Arrow Keys or h/j/k/l  | Move the active bubble
+Drag and Drop, Arrow Keys, hjkl, awsd | Move the active bubble
 --------------------------------------+-----------------------------
 
 
