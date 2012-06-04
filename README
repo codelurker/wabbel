@@ -38,8 +38,6 @@ impacts:
 * Large bubbles have a stronger attack
 * Since the splash radius of their attacks is equal to their size, large
   bubbles will hit more monsters with each attack.
-* When you loose all your lives, large bubbles will pop and give you lives
-  in return
 * Massive bubbles will attack slightly slower
 
 You can paint each bubble with a color by adding or removing the primary colors:

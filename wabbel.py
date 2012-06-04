@@ -22,7 +22,6 @@ from pygame.locals import *
 # def keypress
 # def keyhold
 # def click
-# def die
 
 
 class Globals(object):
@@ -284,7 +283,8 @@ class Monster(Actor):
         self.hp = 0
         g.hp -= 1
         if g.hp <= 0:
-          die()
+          g.log("You have lost the game! Press F8 to restart.")
+          g.log("Final Score: %d" % g.score)
       else:
         self.checkpoint += 1
         self.x, self.y = g.level[self.checkpoint]
@@ -542,22 +542,6 @@ def click(action, pos, button):
       g.drag = None
   elif button == 3:
     g.active = None
-
-
-def die():
-  towers = [t for t in g.towers if t.size >= 20]
-  if towers:
-    g.towers.remove(towers[0])
-    life = min(10, int(towers[0].size / 20))
-    g.log("Your strongest bubble sacrificed itself to give you %d life!" % life)
-    if g.active == towers[0]:
-      g.active = None
-      g.drag = None  # g.drag == X implies g.active == X
-    g.hp += life
-  else:
-    g.log("You have lost the game! Press F10 to restart.")
-    g.log("Final Score: %d" % g.score)
-
 
 # Lib {{{
 def _scaled(dots, width, height):
