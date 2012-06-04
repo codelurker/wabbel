@@ -2,12 +2,13 @@
 # Copyright (C) 2011, 2012  Roman Zimbelmann <hut@lavabit.com>
 # This software is distributed under the terms of the GNU GPL version 3.
 
+import os.path
 import pygame
 import random
 import sys
 import time
 from collections import deque
-from math import *
+from math import sin, cos, atan2, pi, sqrt
 from pygame.locals import *
 
 # -- INDEX --
@@ -26,7 +27,10 @@ from pygame.locals import *
 
 class Globals(object):
   def __init__(g):
-    # constants:
+    """
+    Variables that are initialized here never changed, or only changed once
+    inside the run() function.
+    """
     g.maxfps = 30
     g.w, g.h = 800, 600
     g.profile = '--profile' in sys.argv
@@ -34,6 +38,7 @@ class Globals(object):
     g.font_name = None
     g.font_size = 16, 24
     g.nextwavestep = 1
+    g.waves_per_level = 10
     g.range_color = (32, 32, 32)
     g.level_layouts = [
         [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)],
@@ -43,10 +48,13 @@ class Globals(object):
     g.smallfont = None
     g.max_drag_dist = 100
     g.max_towers = 20
+    g.reset_game()
 
-    g.reset()
-
-  def reset(g):
+  def reset_game(g):
+    """
+    Variables that are initialized here are changed continuously in the course
+    of the game and are reset to their defaults when a new game is started.
+    """
     g.level = list(_scaled(random.choice(g.level_layouts), g.w, g.h))
     g.logged = deque(maxlen=30)
     g.nextwave = 200
@@ -63,10 +71,13 @@ class Globals(object):
     g.mobs = []
     g.waves = list()
     g.towers = list()
-
     g.change_level()
 
   def change_level(g):
+    """
+    Variables that are initialized here are updated every time the level is
+    changed, which occurs every g.waves_per_level waves.
+    """
     g.level_color = _random_color(0xff)
     if g.levelnumber == 0:
       g.gravity = (0, 0.01)
@@ -82,7 +93,8 @@ def run():
   pygame.init()
   pygame.font.init()
   pygame.key.set_repeat(180, 80)
-  flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
+  flags = pygame.DOUBLEBUF # | pygame.RESIZABLE
+#  flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
   if g.fullscreen:
     flags |= pygame.FULLSCREEN
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
@@ -125,7 +137,7 @@ def draw():
 
   g.hp = min(g.maxhp, g.hp + g.hpregeneration)
   if g.towers or g.levelnumber:
-    if g.levelnumber % 10 == 0:
+    if g.levelnumber and g.levelnumber % g.waves_per_level == 0:
       if g.mobs:
         g.nextwave = g.nextwavemax
       else:
@@ -136,7 +148,7 @@ def draw():
     if g.nextwave <= 0:
       g.nextwave = g.nextwavemax
       g.levelnumber += 1
-      g.log("Level %d" % g.levelnumber)
+      g.log("Wave %d" % g.levelnumber)
       g.waves.append(Wave(g.levelnumber))
 
   g.screen.fill((0, 0, 0))
@@ -470,8 +482,8 @@ def keypress(key):
     g.log("n: Send the next wave of enemies")
     g.log("Drag&Drop, Arrow Keys or hjkl: Move the active bubble")
     g.log("q or ESC: quit")
-  elif key == K_F10:
-    g.reset()
+  elif key == K_F8:
+    g.reset_game()
   elif key == ord("c"):
     g.logged.clear()
   elif key == ord("n"):

@@ -18,6 +18,8 @@ Shift+2 | Remove green color from the bubble
 Shift+3 | Remove blue color from the bubble
 --------+-----------------------------------------------------------
 F1      | Display Help
+F8      | Reset Game
+F11     | Toggle Fullscreen
 Space   | Pause the game
 q,Esc   | End the game
 c       | Clear the message log
