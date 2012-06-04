@@ -93,11 +93,13 @@ class Globals(object):
 
 
 def run():
+  """
+  Start the game, initialize pygame and run the input/draw loop
+  """
   pygame.init()
   pygame.font.init()
   pygame.key.set_repeat(180, 80)
-  flags = pygame.DOUBLEBUF # | pygame.RESIZABLE
-#  flags = pygame.SRCALPHA | pygame.DOUBLEBUF # | pygame.RESIZABLE
+  flags = pygame.DOUBLEBUF
   if g.fullscreen:
     flags |= pygame.FULLSCREEN
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
@@ -133,6 +135,9 @@ def run():
 
 
 def draw():
+  """
+  Draw the level, the UI and the actors.
+  """
   if g.hp <= 0:
     return
   if g.pause:
@@ -196,7 +201,7 @@ def draw():
     tower.draw()
     for other in g.towers[i+1:]:
       angle = atan2(tower.y - other.y, tower.x - other.x)
-      distance = sqrt((tower.y - other.y)**2 + (tower.x - other.x)**2)
+      distance = tower.distance(other.x, other.y)
       if distance > 5:
         attraction = (tower.size + other.size) / 10 / distance
         tower.vx -= cos(angle) * attraction * tower.inertia
@@ -412,7 +417,7 @@ class Tower(Actor):
 
     if self.support > 0:
       for tower in g.towers:
-        if tower != self and self.distance(tower.x, tower.y) < self.range \
+        if tower != self and tower.distance(self.x, self.y) < self.range \
             and tower.bonus_damage < self.support:
           tower.bonus_damage = self.support
           tower.update_stats()
@@ -434,7 +439,7 @@ class Tower(Actor):
       if mob.hp > 0 and \
           abs(mob.x - self.x) < self.range and \
           abs(mob.y - self.y) < self.range and \
-          sqrt((mob.x - self.x) ** 2 + (mob.y - self.y) ** 2) < self.range:
+          self.distance(mob.x, mob.y) < self.range:
         yield mob
 
   def shoot(self):
@@ -450,7 +455,7 @@ class Tower(Actor):
       if mob.hp > 0 and \
           abs(mob.x - target.x) < self.radius and \
           abs(mob.y - target.y) < self.radius and \
-          sqrt((mob.x - target.x) ** 2 + (mob.y - target.y) ** 2) < self.radius:
+          target.distance(mob.x, mob.y) < self.radius:
         if mob.damage(self.damage + self.bonus_damage, self):
           self.size += 1
           self.update_stats()
@@ -478,15 +483,15 @@ class Wave(object):
 
 def keypress(key):
   if key == K_F1:
-    g.log("Space: Pause game")
-    g.log("b: Create a new bubble")
-    g.log("1: Paint the bubble in red")
-    g.log("2: Paint the bubble in green")
-    g.log("3: Paint the bubble in blue")
-    g.log("Tab: Select next bubble")
-    g.log("n: Send the next wave of enemies")
-    g.log("Drag&Drop, Arrow Keys or hjkl: Move the active bubble")
-    g.log("q or ESC: quit")
+    g.log("""Space: Pause game
+b: Create a new bubble
+1: Paint the bubble in red
+2: Paint the bubble in green
+3: Paint the bubble in blue
+Tab: Select next bubble
+n: Send the next wave of enemies
+Drag&Drop, Arrow Keys or hjkl: Move the active bubble
+q or ESC: quit""")
   elif key == K_F8:
     g.reset_game()
   elif key == ord("c"):
@@ -536,8 +541,7 @@ def click(action, pos, button):
   if button == 1:
     if action == MOUSEBUTTONDOWN:
       for tower in reversed(g.towers):
-        dist = sqrt((tower.x - pos[0])**2 + (tower.y - pos[1])**2)
-        if dist <= tower.radius:
+        if tower.distance(pos[0], pos[1]) <= tower.radius:
           g.drag = tower
           g.active = tower
           break
