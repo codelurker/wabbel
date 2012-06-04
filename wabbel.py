@@ -14,14 +14,14 @@ from pygame.locals import *
 # -- INDEX --
 # class Globals
 # def run()
-# def draw
+# def draw()
 # class Actor
 # class Monster(Actor)
 # class Tower(Actor)
 # class Wave
-# def keypress
-# def keyhold
-# def click
+# def keypress(key)
+# def keyhold(pressed)
+# def click(action, pos, button)
 
 
 class Globals(object):
@@ -45,6 +45,9 @@ class Globals(object):
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
     g.hp_cost = 1
+    g.hp_damage = 0.6
+    g.monster_min_speed = 0.3
+    g.monster_min_armor = 0.5
     g.min_hp_for_buying = 5
     g.color_step = 10
     g.clock = None
@@ -138,26 +141,47 @@ def draw():
   """
   Draw the level, the UI and the actors.
   """
-  if g.hp <= 0:
-    return
-  if g.pause:
-    return
+  if g.hp > 0 and not g.pause:
+    g.hp = min(g.maxhp, g.hp + g.hpregeneration)
+    if g.towers or g.level:
+      if g.level and g.level % g.waves_per_level == 0:
+        if g.mobs:
+          g.nextwave = g.nextwavemax
+        else:
+          g.change_level()
+          g.nextwave = 0
 
-  g.hp = min(g.maxhp, g.hp + g.hpregeneration)
-  if g.towers or g.level:
-    if g.level and g.level % g.waves_per_level == 0:
-      if g.mobs:
+      g.nextwave -= g.nextwavestep
+      if g.nextwave <= 0:
         g.nextwave = g.nextwavemax
-      else:
-        g.change_level()
-        g.nextwave = 0
+        g.level += 1
+        g.log("Wave %d" % g.level)
+        g.waves.append(Wave(g.level))
 
-    g.nextwave -= g.nextwavestep
-    if g.nextwave <= 0:
-      g.nextwave = g.nextwavemax
-      g.level += 1
-      g.log("Wave %d" % g.level)
-      g.waves.append(Wave(g.level))
+    for wave in list(g.waves):
+      if wave.monsters_left > 0:
+        wave.tick()
+      else:
+        g.waves.remove(wave)
+
+    for mob in list(g.mobs):
+      if mob.hp <= 0:
+        g.mobs.remove(mob)
+      else:
+        mob.walk()
+
+    g.towers.sort(key=lambda tower: -tower.size)
+    for i, tower in enumerate(tuple(g.towers)):
+      tower.walk()
+      for other in g.towers[i+1:]:
+        angle = atan2(tower.y - other.y, tower.x - other.x)
+        distance = tower.distance(other.x, other.y)
+        if distance > 5:
+          attraction = (tower.size * other.size) / 10 / distance
+          tower.vx -= cos(angle) * attraction / (tower.size + 1)
+          tower.vy -= sin(angle) * attraction / (tower.size + 1)
+          other.vx += cos(angle) * attraction / (other.size + 1)
+          other.vy += sin(angle) * attraction / (other.size + 1)
 
   g.screen.fill((0, 0, 0))
 
@@ -172,17 +196,8 @@ def draw():
   for dot in g.checkpoints:
     pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1]+1), 10, 0)
 
-  for wave in list(g.waves):
-    if wave.monsters_left > 0:
-      wave.tick()
-    else:
-      g.waves.remove(wave)
-
-  for mob in list(g.mobs):
-    if mob.hp <= 0:
-      g.mobs.remove(mob)
-    else:
-      mob.draw()
+  for mob in g.mobs:
+    mob.draw()
 
   if g.drag:
     mouse = pygame.mouse.get_pos()
@@ -195,19 +210,8 @@ def draw():
       g.drag_to = g.drag.x + g.max_drag_dist * cos(angle), \
                   g.drag.y + g.max_drag_dist * sin(angle)
 
-  g.towers.sort(key=lambda tower: -tower.size)
-  for i, tower in enumerate(list(g.towers)):
-    tower.act()
+  for tower in tuple(g.towers):
     tower.draw()
-    for other in g.towers[i+1:]:
-      angle = atan2(tower.y - other.y, tower.x - other.x)
-      distance = tower.distance(other.x, other.y)
-      if distance > 5:
-        attraction = (tower.size + other.size) / 10 / distance
-        tower.vx -= cos(angle) * attraction * tower.inertia
-        tower.vy -= sin(angle) * attraction * tower.inertia
-        other.vx += cos(angle) * attraction * other.inertia
-        other.vy += sin(angle) * attraction * other.inertia
 
   if g.drag:
     pygame.draw.line(g.screen, g.drag.color, g.drag.pos, g.drag_to, 3)
@@ -283,7 +287,7 @@ class Monster(Actor):
     self.original_color = self.color
     self.original_armor = self.armor
 
-  def draw(self):
+  def walk(self):
     point1 = g.checkpoints[self.checkpoint]
     point2 = g.checkpoints[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
@@ -294,7 +298,7 @@ class Monster(Actor):
         abs(point2[1] - self.y) < self.speed * 2:
       if self.checkpoint >= len(g.checkpoints) - 2:
         self.hp = 0
-        g.hp -= 1
+        g.hp -= g.hp_damage
         if g.hp <= 0:
           g.log("You have lost the game! Press F8 to restart.")
           g.log("Final Score: %d" % g.score)
@@ -302,6 +306,7 @@ class Monster(Actor):
         self.checkpoint += 1
         self.x, self.y = g.checkpoints[self.checkpoint]
 
+  def draw(self):
     if self.square:
       pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
     else:
@@ -312,10 +317,12 @@ class Monster(Actor):
     self.hp -= damage
     self.color = _scale_color(self.color, self.hp / self.maxhp)
     self.speed -= tower.freeze * self.original_speed
-    self.speed = min(self.original_speed, max(self.original_speed / 2.0, self.speed))
+    self.speed = min(self.original_speed, max(self.original_speed *
+      g.monster_min_speed, self.speed))
     if tower.armor_decay:
       self.armor -= tower.armor_decay
-      self.armor = min(self.original_armor, max(self.original_armor / 2.0, self.armor))
+      self.armor = min(self.original_armor, max(self.original_armor *
+        g.monster_min_armor, self.armor))
     if self.hp <= 0 and -self.hp <= damage:
       return True
     return False
@@ -329,7 +336,7 @@ class Tower(Actor):
     else:
       self.color = self.starting_towers[0]
     self.red, self.green, self.blue = self.color
-    self.size = 1
+    self.size = 0
     self.x = g.w
     self.y = g.h * 0.5
     self.vx = random.randint(-100, -40)
@@ -358,7 +365,7 @@ class Tower(Actor):
     self.support = 0
     self.inflate = 0
 #    self.inflate = (self.magenta / 255.0) ** 4 * 3
-    self.radius = int(sqrt((50 + self.size * 1.3) * (1+self.inflate) * pi))
+    self.radius = int(sqrt((50 + self.size * 1.5) * (1+self.inflate) * pi))
     self.range = int(self.radius + 30 + sqrt(g * 10) * 2)
 
     self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
@@ -391,7 +398,7 @@ class Tower(Actor):
     self.stats.append("kills: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
 
-  def act(self):
+  def walk(self):
     if g.drag == self:
       self.vx += (g.drag_to[0] - self.x) / 30 * self.inertia
       self.vy += (g.drag_to[1] - self.y) / 30 * self.inertia
@@ -400,6 +407,7 @@ class Tower(Actor):
         self.vx += g.gravity[0]
         self.vy += g.gravity[1]
 
+    self.phase = (self.phase + pi/12) % (2*pi)
     self.y += self.vy
     self.x += self.vx
     if self.x - self.radius < 0 or self.x + self.radius > g.w:
@@ -427,8 +435,6 @@ class Tower(Actor):
     hhalf = (1 + 0.2 * sin(self.phase)) * self.radius
     x = int(self.x - whalf)
     y = int(self.y - hhalf)
-#    pygame.draw.circle(g.screen, (0, 255, 255), (int(self.x), int(self.y)), self.radius, 0)
-    self.phase = (self.phase + pi/12) % (2*pi)
     rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
     pygame.draw.ellipse(g.screen, (20, 20, 20), rect, 0)
     rect = Rect(x, y, whalf*2, hhalf*2)
@@ -491,7 +497,7 @@ b: Create a new bubble
 Tab: Select next bubble
 n: Send the next wave of enemies
 Drag&Drop, Arrow Keys or hjkl: Move the active bubble
-q or ESC: quit""")
+q or ESC: quit""".split("\n"))
   elif key == K_F8:
     g.reset_game()
   elif key == ord("c"):
