@@ -1,15 +1,34 @@
-#!/usr/bin/python2 -OOBts
-# Copyright (C) 2011, 2012  Roman Zimbelmann <hut@lavabit.com>
+#!/usr/bin/python2 -OBts
+# Copyright (C) 2012  Roman Zimbelmann <hut@lavabit.com>
 # This software is distributed under the terms of the GNU GPL version 3.
+"""Usage: wabbel [options]
+
+Options:
+  -h, --help
+  --version
+  --easy
+  --fullscreen
+  --profile
+
+Key bindings:
+Space: Pause game
+b: Create a new bubble
+1: Paint the bubble in red
+2: Paint the bubble in green
+3: Paint the bubble in blue
+Tab: Select next bubble
+n: Send the next wave of enemies
+Drag&Drop, Arrow Keys or hjkl: Move the active bubble
+q or ESC: quit"""
 
 import os.path
 import pygame
-import random
 import sys
 import time
 from collections import deque
 from math import sin, cos, atan2, pi, sqrt
 from pygame.locals import *
+from random import randint, choice, shuffle
 
 # -- INDEX --
 # class Globals
@@ -30,27 +49,33 @@ class Globals(object):
     Variables that are initialized here never changed, or only changed once
     inside the run() function.
     """
+    g.version = "0.1"
+    g.highscorefile = os.path.expanduser("~/.wabbel_highscore")
     g.maxfps = 30
     g.w, g.h = 800, 600
     g.profile = '--profile' in sys.argv
+    g.easy = '--easy' in sys.argv
     g.fullscreen = '--fullscreen' in sys.argv
-    g.debug = '--debug' in sys.argv
+    g.name = os.environ.get("USER", "unknown")
     g.font_name = None
     g.font_size = 16, 24
     g.nextwavestep = 1
     g.waves_per_level = 10
     g.range_color = (32, 32, 32)
     g.level_layouts = [
-        [(0, 0.7), (0.4, 0.5), (0.5, 0.9), (0.95, 0.8), (0.7, 0.2), (0, 0.3)],
+        [(0, 7), (4, 5), (5, 9), (9.5, 8), (7, 2), (0, 3)],
+        [(4, 0), (4.4, 5), (2, 7), (3, 9), (8, 8), (5.6, 5), (6, 0)],
+        [(1, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
+        [(0, 4), (3.5, 4), (5, 2), (7, 2), (3, 7), (7, 7), (9, 5), (0, 5)],
     ]
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
-    g.hp_cost = 0 if g.debug else 1
-    g.hp_damage = 0 if g.debug else 0.6
+    g.hp_cost = 0.5 if g.easy else 1
+    g.hp_damage = 0.3 if g.easy else 0.6
     g.monster_min_speed = 0.3
     g.monster_min_armor = 0.5
     g.min_hp_for_buying = 2
-    g.color_step = 10
+    g.color_step = 12
     g.clock = None
     g.font = None
     g.smallfont = None
@@ -63,8 +88,6 @@ class Globals(object):
     Variables that are initialized here are changed continuously in the course
     of the game and are reset to their defaults when a new game is started.
     """
-    g.checkpoints = [(int(d[0] * g.w), int(d[1] * g.h)) for d in
-        random.choice(g.level_layouts)]
     g.logged = deque(maxlen=30)
     g.nextwave = 200
     g.nextwavemax = g.nextwave
@@ -86,15 +109,47 @@ class Globals(object):
     changed, which occurs every g.waves_per_level waves.
     """
     g.level_color = _random_color(0xff)
-    if g.level == 0:
-      g.gravity = (0, 0.01)
+    g.checkpoints = [(int(d[0] * g.w / 10), int(d[1] * g.h / 10)) for d in
+        choice(g.level_layouts)]
+    if randint(0,1) == 0:
+      g.checkpoints = [(g.w-d[0], d[1]) for d in g.checkpoints]
+    if randint(0,1) == 0:
+      g.checkpoints = [(d[0], g.h-d[1]) for d in g.checkpoints]
+    if randint(0,1) == 0:
+      g.checkpoints.reverse()
+
+    # global gravity
+    if randint(0,3) == 0:
+      g.gravity = (0, 0)
     else:
-      grav = min(100, g.level * 3)
-      g.gravity = (0.001 * random.randint(-grav,grav),
-          0.001 * random.randint(-grav,grav))
+      g.gravity = (0, 0.001 * randint(0, min(100, g.level * 3)))
+      if randint(0, 2) == 0:
+        # vertical gravity instead
+        g.gravity = (choice([1, -1]) * g.gravity[1], 0)
 
   def log(g, obj):
     g.logged.append(str(obj))
+
+  def lose(g):
+    g.hp = 0
+    g.log("You have lost the game! Press F8 to restart.")
+    g.log("Final Score: %d" % g.score)
+    try:
+      highscores = open(g.highscorefile, "r").read().strip().split("\n")
+    except:
+      highscores = []
+
+    if g.score > 0:
+      highscores.append("%d - %s" % (g.score, g.name))
+      highscores.sort(key=_highscore_sorting_key)
+      highscores.reverse()
+      f = open(g.highscorefile, "w")
+      f.write("\n".join(highscores) + "\n")
+
+    g.log(" ")
+    g.log("Top 10:")
+    for score, _ in zip(highscores, range(10)):
+      g.log(score)
 
 
 def run():
@@ -127,15 +182,57 @@ def run():
       if event.type == QUIT:
         return
       elif event.type == KEYDOWN:
-        if event.key == K_ESCAPE or event.key == K_q:
-          return
-        elif event.key == K_F11:
-          pygame.display.toggle_fullscreen()
-        else:
-          keypress(event.key)
+        keypress(event.key)
       elif event.type in (MOUSEBUTTONDOWN, MOUSEBUTTONUP):
         click(event.type, event.pos, event.button)
     keyhold(pygame.key.get_pressed())
+
+    # Handle waves, monsters and towers:
+    if g.hp > 0 and not g.pause:
+      g.hp = min(g.maxhp, g.hp + g.hpregeneration)
+      if g.towers or g.level:
+        if g.level and g.level % g.waves_per_level == 0:
+          if g.mobs:
+            g.nextwave = g.nextwavemax
+          else:
+            g.change_level()
+            g.nextwave = 0
+
+        g.nextwave -= g.nextwavestep
+        if g.nextwave <= 0:
+          g.nextwave = g.nextwavemax
+          g.level += 1
+          g.log("Wave %d" % g.level)
+          g.waves.append(Wave(g.level))
+
+      for wave in list(g.waves):
+        if wave.monsters_left > 0:
+          wave.tick()
+        else:
+          g.waves.remove(wave)
+
+      for mob in list(g.mobs):
+        if mob.hp <= 0:
+          g.mobs.remove(mob)
+        else:
+          mob.walk()
+
+    if g.hp > 0 and not g.pause:
+      g.towers.sort(key=lambda tower: -tower.size)
+      for i, tower in enumerate(tuple(g.towers)):
+        tower.walk()
+        # gravitational attraction:
+        for other in g.towers[i+1:]:
+          angle = atan2(tower.y - other.y, tower.x - other.x)
+          distance = tower.distance(other.x, other.y)
+          if distance > 10 and distance < 200:
+            g1 = tower.size + 1
+            g2 = other.size + 1
+            attraction = (g1 * g2) / distance**2
+            tower.vx -= cos(angle) * attraction / g1
+            tower.vy -= sin(angle) * attraction / g1
+            other.vx += cos(angle) * attraction / g2
+            other.vy += sin(angle) * attraction / g2
     draw()
 
 
@@ -143,53 +240,7 @@ def draw():
   """
   Draw the level, the UI and the actors.
   """
-  if g.hp > 0 and not g.pause:
-    g.hp = min(g.maxhp, g.hp + g.hpregeneration)
-    if g.towers or g.level:
-      if g.level and g.level % g.waves_per_level == 0:
-        if g.mobs:
-          g.nextwave = g.nextwavemax
-        else:
-          g.change_level()
-          g.nextwave = 0
-
-      g.nextwave -= g.nextwavestep
-      if g.nextwave <= 0:
-        g.nextwave = g.nextwavemax
-        g.level += 1
-        g.log("Wave %d" % g.level)
-        g.waves.append(Wave(g.level))
-
-    for wave in list(g.waves):
-      if wave.monsters_left > 0:
-        wave.tick()
-      else:
-        g.waves.remove(wave)
-
-    for mob in list(g.mobs):
-      if mob.hp <= 0:
-        g.mobs.remove(mob)
-      else:
-        mob.walk()
-
-  if g.hp > 0 and not g.pause or g.debug:
-    g.towers.sort(key=lambda tower: -tower.size)
-    for i, tower in enumerate(tuple(g.towers)):
-      tower.walk()
-      for other in g.towers[i+1:]:
-        angle = atan2(tower.y - other.y, tower.x - other.x)
-        distance = tower.distance(other.x, other.y)
-        if distance > 10:
-          g1 = tower.size + 1
-          g2 = other.size + 1
-          attraction = (g1 * g2) / distance**2
-          tower.vx -= cos(angle) * attraction / g1
-          tower.vy -= sin(angle) * attraction / g1
-          other.vx += cos(angle) * attraction / g2
-          other.vy += sin(angle) * attraction / g2
-
   g.screen.fill((0, 0, 0))
-
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
 
@@ -233,7 +284,7 @@ def draw():
       g.screen.blit(text, (x - text.get_rect().width, y))
       y += text.get_rect().height + 2
 
-  x, y = 0, 0
+  x, y = 20, 0
   for line in g.logged:
     if not line:
       continue
@@ -241,7 +292,7 @@ def draw():
     g.screen.blit(text, (x, y))
     y += text.get_rect().height + 2
 
-  line = "%d %d" % (g.clock.get_fps(), g.score)
+  line = "%d fps  score: %d" % (g.clock.get_fps(), g.score)
   text = g.font.render(line, 1, (150, 150, 150))
   g.screen.blit(text, (10, g.h-10-text.get_rect().height))
 
@@ -262,11 +313,10 @@ class Monster(Actor):
     self.level = level
     self.hp = 6 * level
     self.checkpoint = 0
-    self.speed = 1 + level * 0.1 + random.randint(-10,10) * 0.04
+    self.speed = 1 + level * 0.1 + randint(-10,10) * 0.04
     self.danger = 0
     self.armor = max(0, (level - 5)/2)
-    self.color = (random.randint(1,3) * 63, random.randint(1,3) * 63,
-        random.randint(1,3) * 63)
+    self.color = (randint(1,3) * 63, randint(1,3) * 63, randint(1,3) * 63)
     self.x, self.y = g.checkpoints[self.checkpoint]
     if level % 3 == 0:
       self.square = True
@@ -294,8 +344,7 @@ class Monster(Actor):
         self.hp = 0
         g.hp -= g.hp_damage
         if g.hp <= 0:
-          g.log("You have lost the game! Press F8 to restart.")
-          g.log("Final Score: %d" % g.score)
+          g.lose()
       else:
         self.checkpoint += 1
         self.x, self.y = g.checkpoints[self.checkpoint]
@@ -307,9 +356,9 @@ class Monster(Actor):
       pygame.draw.circle(g.screen, self.color, self.pos, 5, 2)
 
   def damage(self, damage, tower):
-    damage -= self.armor * (1 - tower.armor_pierce)
+    damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
     self.hp -= damage
-    self.color = _scale_color(self.color, self.hp / self.maxhp)
+    self.color = _scale_color(self.original_color, self.hp / self.maxhp)
     self.speed -= tower.freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed *
       g.monster_min_speed, self.speed))
@@ -323,18 +372,18 @@ class Monster(Actor):
 
 
 class Tower(Actor):
-  starting_towers = [(64, 0, 0), (0, 64, 0), (0, 0, 64)]
+  starting_towers = [(60, 0, 0), (0, 60, 0), (0, 0, 60)]
   def __init__(self):
     if g.towers:
-      self.color = random.choice(self.starting_towers)
+      self.color = choice(self.starting_towers)
     else:
       self.color = self.starting_towers[0]
     self.red, self.green, self.blue = self.color
     self.size = 0
     self.x = g.w
     self.y = g.h * 0.5
-    self.vx = random.randint(-100, -40)
-    self.vy = random.randint(-100, 100)
+    self.vx = randint(-100, -40)
+    self.vy = randint(-100, 100)
     self.last_shot = 0
     self.range = 100
     self.phase = 0
@@ -358,9 +407,9 @@ class Tower(Actor):
     self.freeze = b / 2048.0
     self.armor_pierce = 0
     self.support = 0
-    self.inflate = 0
-#    self.inflate = (self.magenta / 255.0) ** 4 * 3
-    self.radius = int(sqrt((50 + self.size * 1.5) * (1+self.inflate) * pi))
+    if self.magenta > 0:
+      self.support = self.size / 20.0 + self.magenta / 16.0
+    self.radius = int(sqrt((50 + self.size * 1.5) * pi))
     self.range = int(self.radius + 30 + sqrt(g * 10) * 2)
 
     self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
@@ -383,7 +432,6 @@ class Tower(Actor):
     if self.armor_decay > 0:
       self.stats.append("cyan: %.2f armor breaking" % self.armor_decay)
     if self.magenta > 0:
-      self.support = self.size / 20.0 + self.magenta / 16.0
       self.stats.append("magenta: adds %d damage to bubbles in range" % self.support)
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
@@ -411,15 +459,16 @@ class Tower(Actor):
         self.vy += g.gravity[1]
 
     self.phase = (self.phase + pi/12) % (2*pi)
-    self.y += self.vy
-    self.x += self.vx
-    if self.x - self.radius < 0 or self.x + self.radius > g.w:
-      self.vx *= -1
-    if self.y - self.radius < 0 or self.y + self.radius > g.h:
-      self.vy *= -1
-
+    self.x = min(g.w, max(0, self.x + self.vx))
+    self.y = min(g.h, max(0, self.y + self.vy))
     self.vx *= 0.97
     self.vy *= 0.97
+    if self.x - self.radius < 0 and self.vx < 0 or \
+        self.x + self.radius > g.w and self.vx > 0:
+      self.vx *= -1
+    if self.y - self.radius < 0 and self.vy < 0 or \
+        self.y + self.radius > g.h and self.vy > 0:
+      self.vy *= -1
 
     if self.last_shot + self.shot_delay < time.time():
       self.shoot()
@@ -493,18 +542,14 @@ class Wave(object):
 
 
 def keypress(key):
-  if key == K_F1:
-    g.log("""Space: Pause game
-b: Create a new bubble
-1: Paint the bubble in red
-2: Paint the bubble in green
-3: Paint the bubble in blue
-Tab: Select next bubble
-n: Send the next wave of enemies
-Drag&Drop, Arrow Keys or hjkl: Move the active bubble
-q or ESC: quit""".split("\n"))
+  if key in (K_ESCAPE, K_q):
+    raise SystemExit()
+  elif key == K_F1:
+    [g.log(line) for line in __doc__.split("\n")]
   elif key == K_F8:
     g.reset_game()
+  elif key == K_F11:
+    pygame.display.toggle_fullscreen()
   elif key == ord("c"):
     g.logged.clear()
   elif key == ord("n"):
@@ -563,35 +608,52 @@ def click(action, pos, button):
   elif button == 3:
     g.active = None
 
-# Lib {{{
+
 def _scale_color(color, factor):
   return (max(0, min(255, int(color[0] * factor))),
       max(0, min(255, int(color[1] * factor))),
       max(0, min(255, int(color[2] * factor))))
 
+
 def _draw_bar(x, y, length, width, color):
   if length > 0:
     pygame.draw.line(g.screen, color, (x, y), (x + length, y), width)
 
+
 def _random_color(maximum):
   color = [0, 0, 0]
   for i in range(min(3*255, maximum)):
-    random.shuffle(color)
+    shuffle(color)
     for n in range(3):
       if color[n] < 255:
         color[n] += 1
         break
   return color
-#}}}
+
+
+def _highscore_sorting_key(line):
+  try:
+    return int(line.split()[0])
+  except:
+    return 0
+
 
 if __name__ == '__main__':
   global g
   g = Globals()
-  if g.profile:
-    import cProfile
-    import pstats
-    exit_code = cProfile.run('sys.modules[__name__].run()', '/tmp/profile')
-    p = pstats.Stats('/tmp/profile')
-    p.strip_dirs().sort_stats('cumulative').print_callees()
+
+  if '--help' in sys.argv or '-h' in sys.argv:
+    print(__doc__)
+
+  elif '--version' in sys.argv:
+    print(g.version)
+
   else:
-    run()
+    if g.profile:
+      import cProfile
+      import pstats
+      exit_code = cProfile.run('sys.modules[__name__].run()', '/tmp/profile')
+      p = pstats.Stats('/tmp/profile')
+      p.strip_dirs().sort_stats('cumulative').print_callees()
+    else:
+      run()
