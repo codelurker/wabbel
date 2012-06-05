@@ -9,18 +9,19 @@ Options:
   --easy
   --fullscreen
   --profile
-
+ 
 Key bindings:
 Space: Pause game
-c: Create a new bubble
-r/R: Add/remove red color from the bubble
-g/G: Add/remove green color from the bubble
-b/B: Add/remove blue color from the bubble
+F2: Create a new bubble
+r: Add red color from the bubble (shift+r to remove)
+g: Add green color from the bubble (shift+g to remove)
+b: Add blue color from the bubble (shift+b to remove)
 Tab: Select next bubble
-n: Send the next wave of enemies
+0-9: Select certain bubbles, ordered by size
+F3: Send the next wave of enemies
 F11: Toggle fullscreen (unix only)
 Drag&Drop, Arrow Keys or hjkl: Move the active bubble
-q or ESC: quit"""
+Escape: quit"""
 
 import getpass
 import os.path
@@ -570,7 +571,7 @@ class Wave(object):
 
 
 def keypress(key):
-  if key in (K_ESCAPE, K_q):
+  if key == K_ESCAPE:
     raise SystemExit()
   elif key == K_F1:
     [g.log(line) for line in __doc__.split("\n")]
@@ -580,14 +581,14 @@ def keypress(key):
     pygame.display.toggle_fullscreen()
   elif key == K_F5:
     g.logged.clear()
-  elif key == K_n:
+  elif key in (K_n, K_F3):
     g.nextwave = 0
   elif key == K_d:
     if pygame.key.get_mods() & KMOD_SHIFT and g.active:
       g.towers.remove(g.active)
       g.active = None
       g.drag = None
-  elif key == K_c:
+  elif key in (K_c, K_F2):
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
   elif key == K_SPACE:

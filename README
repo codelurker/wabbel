@@ -17,7 +17,7 @@
 ------+-------------------------------------------------------------
 c, F2 | Create a new bubble
 n, F3 | Send the next wave of monsters
-D, F4 | Destroy the active bubble
+D     | Destroy the active bubble
 tab   | Select the next bubble (in order of size)
 TAB   | Select the previous bubble (in order of size)
 1-9   | Select the 1-9th largest bubble
