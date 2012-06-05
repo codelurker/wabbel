@@ -3,27 +3,40 @@
 * pygame
 
 
+== Technical Stuff ==
+* The high score table is saved at ~/.wabbel_highscore.
+* The name of the player is taken from the $USER environment variable.
+  To change it in windows, set the environmental variable USER to your name.
+  To change it in a unix system, run:
+    USER="your name" wabbel
+* The F11 button does not seem to work in windows.  If you want to play in full
+  screen mode, you have to use the --fullscreen option when starting.
+
+
 == Key Bindings ==
---------+-----------------------------------------------------------
-b       | Create a new bubble
-D       | Destroy the active bubble
-n       | Send the next wave of monsters
-Tab     | Select the next bubble (in order of size)
---------+-----------------------------------------------------------
-1       | Paint the bubble in red
-2       | Paint the bubble in green
-3       | Paint the bubble in blue
-Shift+1 | Remove red color from the bubble
-Shift+2 | Remove green color from the bubble
-Shift+3 | Remove blue color from the bubble
---------+-----------------------------------------------------------
-F1      | Display Help
-F8      | Reset Game
-F11     | Toggle Fullscreen
-Space   | Pause the game
-q,Esc   | End the game
-c       | Clear the message log
---------+-----------------------------+-----------------------------
+------+-------------------------------------------------------------
+c, F2 | Create a new bubble
+n, F3 | Send the next wave of monsters
+D, F4 | Destroy the active bubble
+tab   | Select the next bubble (in order of size)
+TAB   | Select the previous bubble (in order of size)
+1-9   | Select the 1-9th largest bubble
+0     | Select the weakest bubble
+------+-------------------------------------------------------------
+r     | Paint the bubble in red
+g     | Paint the bubble in green
+b     | Paint the bubble in blue
+R     | Remove red color from the bubble
+G     | Remove green color from the bubble
+B     | Remove blue color from the bubble
+------+-------------------------------------------------------------
+F1    | Display Help
+F8    | Reset Game
+F11   | Toggle Fullscreen
+Space | Pause the game
+q,Esc | End the game
+F5    | Clear the message log
+------+-------------------------------+-----------------------------
 Drag and Drop, Arrow Keys, hjkl, awsd | Move the active bubble
 --------------------------------------+-----------------------------
 

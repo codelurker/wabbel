@@ -12,15 +12,17 @@ Options:
 
 Key bindings:
 Space: Pause game
-b: Create a new bubble
-1: Paint the bubble in red
-2: Paint the bubble in green
-3: Paint the bubble in blue
+c: Create a new bubble
+r/R: Add/remove red color from the bubble
+g/G: Add/remove green color from the bubble
+b/B: Add/remove blue color from the bubble
 Tab: Select next bubble
 n: Send the next wave of enemies
+F11: Toggle fullscreen (unix only)
 Drag&Drop, Arrow Keys or hjkl: Move the active bubble
 q or ESC: quit"""
 
+import getpass
 import os.path
 import pygame
 import sys
@@ -56,7 +58,10 @@ class Globals(object):
     g.profile = '--profile' in sys.argv
     g.easy = '--easy' in sys.argv
     g.fullscreen = '--fullscreen' in sys.argv
-    g.name = os.environ.get("USER", "unknown")
+    try:
+      g.name = os.environ.get("USER", getpass.getuser())
+    except:
+      g.name = "unknown"
     g.font_name = None
     g.font_size = 16, 24
     g.nextwavestep = 1
@@ -568,23 +573,29 @@ def keypress(key):
     g.reset_game()
   elif key == K_F11:
     pygame.display.toggle_fullscreen()
-  elif key == ord("c"):
+  elif key == K_F5:
     g.logged.clear()
-  elif key == ord("n"):
+  elif key == K_n:
     g.nextwave = 0
-  elif key == ord("d"):
+  elif key == K_d:
     if pygame.key.get_mods() & KMOD_SHIFT and g.active:
       g.towers.remove(g.active)
       g.active = None
       g.drag = None
-  elif key == ord("b"):
+  elif key == K_c:
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
-  elif key == ord(" "):
+  elif key == K_SPACE:
     g.pause ^= True
-  elif key in (K_1, K_2, K_3):
+  elif key in range(K_1, K_9 + 1):
+    if len(g.towers) > key - K_1:
+      g.active = g.towers[key - K_1]
+  elif key == K_0:
+    if len(g.towers):
+      g.active = g.towers[-1]
+  elif key in (K_r, K_g, K_b):
     if g.active:
-      c = {K_1: "red", K_2: "green", K_3: "blue"}[key]
+      c = {K_r: "red", K_g: "green", K_b: "blue"}[key]
       if pygame.key.get_mods() & KMOD_SHIFT:
         if g.active.__dict__[c] > 0:
           g.active.__dict__[c] = max(0, g.active.__dict__[c] - g.color_step)
