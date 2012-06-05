@@ -57,8 +57,9 @@ You can mix two colors and leave out the third color for a bonus effect:
 * Yellow (red + green) increases the attack speed of the bubble
 * Cyan (green + blue) adds an armor damaging effect to each shot, which reduces
   the armor of the monster by a given amount.
-* Purple (blue + red) adds a supportive effect that increases the damage of
-  each bubble in the range.
+* Magenta (blue + red) adds a supportive effect that increases the damage of
+  each bubble in the range.  This effect doesn't stack, the stronger effect
+  takes precedence.
 
 Note that a yellow bubble will lose yellowness if you add blue, so you can't
 have one bubble with all the bonuses.
@@ -68,7 +69,8 @@ There are some bonus effects which you get for specific color mixtures:
   purity bonus of +2 attacks per second.
 * If your primary colors (red, green, blue) are all zero, you get a black hole
   bonus of 100% armor penetration.
-
+* If your primary colors are all between 30% and 50%, you get a pin head
+  bonus, greatly increasing the inertia, making it more difficult to move it.
 
 == Monsters ==
 

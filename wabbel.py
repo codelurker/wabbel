@@ -142,7 +142,7 @@ class Globals(object):
       highscores = []
 
     if g.score > 0:
-      highscores.append("%d - %s" % (g.score, g.name))
+      highscores.append("%d - %s" % (g.score, g.name + (" (easy)" if g.easy else "")))
       highscores.sort(key=_highscore_sorting_key)
       highscores.reverse()
       f = open(g.highscorefile, "w")
@@ -231,10 +231,10 @@ def run():
             g1 = tower.size + 1
             g2 = other.size + 1
             attraction = (g1 * g2) / distance**2
-            tower.vx -= cos(angle) * attraction / g1
-            tower.vy -= sin(angle) * attraction / g1
-            other.vx += cos(angle) * attraction / g2
-            other.vy += sin(angle) * attraction / g2
+            tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
+            tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
+            other.vx += cos(angle) * attraction / g2 / other.pinhead
+            other.vy += sin(angle) * attraction / g2 / other.pinhead
     draw()
 
 
@@ -425,7 +425,8 @@ class Tower(Actor):
     self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
-    self.inertia = 4.0 / (4 + self.size / 100.0)
+    self.pinhead = 4 if all(color in range(76, 128) for color in self.color) else 1
+    self.inertia = 4.0 / (4 + self.size * self.pinhead / 100.0)
     if self.color == (0, 0, 0):
       self.armor_pierce = 1
 
@@ -445,6 +446,8 @@ class Tower(Actor):
       self.stats.append("magenta: adds %d damage to bubbles in range" % self.support)
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
+    if self.pinhead > 1:
+      self.stats.append("pin head bonus: +300% inertia")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.stats.append("purity bonus: +2 aspd")
     self.stats.append("")
@@ -465,8 +468,8 @@ class Tower(Actor):
       self.vy += (ytarget - self.y) / 30 * self.inertia
     else:
       if self.y + self.radius < g.h:
-        self.vx += g.gravity[0]
-        self.vy += g.gravity[1]
+        self.vx += g.gravity[0] / self.pinhead
+        self.vy += g.gravity[1] / self.pinhead
 
     self.phase = (self.phase + pi/12) % (2*pi)
     self.x = min(g.w, max(0, self.x + self.vx))
