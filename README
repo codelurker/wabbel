@@ -34,7 +34,7 @@ F1    | Display Help
 F8    | Reset Game
 F11   | Toggle Fullscreen
 Space | Pause the game
-q,Esc | End the game
+Esc   | End the game
 F5    | Clear the message log
 ------+-------------------------------+-----------------------------
 Drag and Drop, Arrow Keys, hjkl, awsd | Move the active bubble
