@@ -44,6 +44,11 @@ from random import randint, choice, shuffle
 # def keyhold(pressed)
 # def click(action, pos, button)
 
+# -- TODO --
+# Add more types of enemies?
+# Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
+# Maps that morph and breathe, with edge points spiraling in and out
+
 
 class Globals(object):
   def __init__(g):
