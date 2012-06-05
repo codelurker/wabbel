@@ -87,6 +87,7 @@ class Globals(object):
     g.monster_min_armor = 0.5
     g.min_hp_for_buying = 2
     g.color_step = 12
+    g.buttons = list()
     g.clock = None
     g.font = None
     g.smallfont = None
@@ -182,6 +183,11 @@ def run():
   g.clock = pygame.time.Clock()
   g.w, g.h = g.screen.get_size()
   g.log("Welcome! Press F1 to display help.")
+
+  for i, color, key in zip(range(3), [(200,0,0), (0,200,0), (0,0,255)],
+      ["red", "green", "blue"]):
+    g.buttons.append(ColorButton(700 + i * 24, 550, color, key, -g.color_step))
+    g.buttons.append(ColorButton(700 + i * 24, 570, color, key, g.color_step))
 
   next_log_refresh = 0
 
@@ -301,6 +307,9 @@ def draw():
       g.screen.blit(text, (x - text.get_rect().width, y))
       y += text.get_rect().height + 2
 
+    for button in g.buttons:
+      button.draw()
+
   x, y = 20, 0
   for line in g.logged:
     if not line:
@@ -325,6 +334,35 @@ class Actor(object):
   def distance(self, x, y):
     return sqrt((x-self.x) ** 2 + (y-self.y) ** 2)
 
+
+class ColorButton(Actor):
+  def __init__(self, x, y, color, key, offset):
+    self.x, self.y = x, y
+    self.radius = 12
+    self.color = color
+    self.key = key
+    self.offset = offset
+
+  def draw(self):
+    if not self.is_visible():
+      return
+    pygame.draw.circle(g.screen, (20, 20, 20), (self.x, self.y), 12, 0)
+    pygame.draw.circle(g.screen, self.color, (self.x, self.y), 10, 0)
+    pygame.draw.line(g.screen, (20, 20, 20),
+        (self.x - 6, self.y - 1), (self.x + 4, self.y - 1), 2)
+    if self.offset > 0:
+      pygame.draw.line(g.screen, (20, 20, 20),
+          (self.x - 1, self.y - 5), (self.x - 1, self.y + 4), 2)
+
+  def is_visible(self):
+    return g.active and g.active.__dict__[self.key] + self.offset in range(0,256)
+
+  def click(self):
+    if self.is_visible() and (self.offset <= 0 or g.hp > g.min_hp_for_buying):
+      g.active.__dict__[self.key] = min(255, max(0, g.active.__dict__[self.key] + self.offset))
+      g.active.update_stats()
+      if self.offset > 0:
+        g.hp -= g.hp_cost
 
 class Monster(Actor):
   def __init__(self, level):
@@ -636,8 +674,12 @@ def click(action, pos, button):
         if tower.distance(pos[0], pos[1]) <= tower.radius:
           g.drag = tower
           g.active = tower
-          break
+          return
       else:
+        for button in g.buttons:
+          if button.distance(pos[0], pos[1]) <= button.radius:
+            button.click()
+            return
         g.active = None
     elif action == MOUSEBUTTONUP:
       g.drag = None
