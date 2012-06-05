@@ -422,7 +422,8 @@ class Tower(Actor):
     self.radius = int(sqrt((50 + self.size * 1.5) * pi))
     self.range = int(self.radius + 30 + sqrt(g * 10) * 2)
 
-    self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) + (self.size / 10000.0))
+    self.shot_delay = max(0.1, 0.4 - (0.3 * self.yellow / 255.0) \
+        + (self.size / 10000.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
     self.pinhead = 4 if all(color in range(76, 128) for color in self.color) else 1
@@ -434,22 +435,26 @@ class Tower(Actor):
 
     self.stats = []
     self.stats.append("DPS: %.2f" % self.dps)
-    self.stats.append("damage: %d + %d + %d" % (size_damage, red_damage, self.bonus_damage))
+    self.stats.append("damage: %d + %d + %d" % (size_damage, red_damage,
+      self.bonus_damage))
     self.stats.append("range: %d" % self.range)
     self.stats.append("attacks per second: %.2f" % (1 / self.shot_delay))
     self.stats.append("")
+    if self.yellow > 0:
+      self.stats.append("yellow: +%.2f attacks/second" % \
+          (1 / self.shot_delay - 1 / max(0.1, 0.4 + (self.size / 10000.0))))
     if self.freeze > 0:
       self.stats.append("blue: %.3f freeze" % self.freeze)
     if self.armor_decay > 0:
       self.stats.append("cyan: %.2f armor breaking" % self.armor_decay)
     if self.magenta > 0:
-      self.stats.append("magenta: adds %d damage to bubbles in range" % self.support)
+      self.stats.append("magenta: +%d damage to bubbles in range" % self.support)
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.pinhead > 1:
       self.stats.append("pin head bonus: +300% inertia")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
-      self.stats.append("purity bonus: +2 aspd")
+      self.stats.append("purity bonus: +2 attacks/second")
     self.stats.append("")
     self.stats.append("kills: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
