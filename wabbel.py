@@ -88,6 +88,8 @@ class Globals(object):
     Variables that are initialized here are changed continuously in the course
     of the game and are reset to their defaults when a new game is started.
     """
+    g.shake = (0, 0)
+    g.shake_until = 0
     g.logged = deque(maxlen=30)
     g.nextwave = 200
     g.nextwavemax = g.nextwave
@@ -244,13 +246,17 @@ def draw():
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
 
+  if g.shake_until > time.time():
+    g.shake = (randint(-3,3), randint(-3,3))
+
   dark = [int(clr*0.5) for clr in g.level_color]
-  pygame.draw.lines(g.screen, dark, False, g.checkpoints, 24)
-  for dot in g.checkpoints:
-    pygame.draw.circle(g.screen, dark, (dot[0], dot[1]+1), 12, 0)
-  pygame.draw.lines(g.screen, g.level_color, False, g.checkpoints, 20)
-  for dot in g.checkpoints:
-    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1]+1), 10, 0)
+  checkpoints = tuple((dot[0] + g.shake[0], dot[1] + g.shake[1]) for dot in g.checkpoints)
+  pygame.draw.lines(g.screen, dark, False, checkpoints, 24)
+  for dot in checkpoints:
+    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 12, 0)
+  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 20)
+  for dot in checkpoints:
+    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 10, 0)
 
   for mob in g.mobs:
     mob.draw()
@@ -292,7 +298,8 @@ def draw():
     g.screen.blit(text, (x, y))
     y += text.get_rect().height + 2
 
-  line = "%d fps  score: %d" % (g.clock.get_fps(), g.score)
+#  line = "%d fps  score: %d" % (g.clock.get_fps(), g.score)
+  line = str(g.score)
   text = g.font.render(line, 1, (150, 150, 150))
   g.screen.blit(text, (10, g.h-10-text.get_rect().height))
 
@@ -342,18 +349,21 @@ class Monster(Actor):
         abs(point2[1] - self.y) < self.speed * 2:
       if self.checkpoint >= len(g.checkpoints) - 2:
         self.hp = 0
-        g.hp -= g.hp_damage
-        if g.hp <= 0:
-          g.lose()
+        if g.hp > 0:
+          g.hp -= g.hp_damage
+          g.shake_until = max(g.shake_until, time.time() + 2.0)
+          if g.hp <= 0:
+            g.lose()
       else:
         self.checkpoint += 1
         self.x, self.y = g.checkpoints[self.checkpoint]
 
   def draw(self):
+    x, y = int(self.x + g.shake[0]), int(self.y + g.shake[1])
     if self.square:
-      pygame.draw.rect(g.screen, self.color, Rect(int(self.x-4), int(self.y-4), 8, 8), 3)
+      pygame.draw.rect(g.screen, self.color, Rect(x-4, y-4, 8, 8), 3)
     else:
-      pygame.draw.circle(g.screen, self.color, self.pos, 5, 2)
+      pygame.draw.circle(g.screen, self.color, (x, y), 5, 2)
 
   def damage(self, damage, tower):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
