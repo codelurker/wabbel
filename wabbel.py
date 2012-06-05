@@ -587,7 +587,8 @@ def keypress(key):
       g.active.update_stats()
   elif key == K_TAB:
     if g.active:
-      g.active = g.towers[(g.towers.index(g.active) + 1) % len(g.towers)]
+      g.active = g.towers[(g.towers.index(g.active) + \
+          (-1 if (pygame.key.get_mods() & KMOD_SHIFT) else 1)) % len(g.towers)]
     elif g.towers:
       g.active = g.towers[0]
 
