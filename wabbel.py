@@ -328,7 +328,7 @@ class Actor(object):
 class Monster(Actor):
   def __init__(self, level):
     self.level = level
-    self.hp = 6 * level
+    self.hp = 8 * level
     self.checkpoint = 0
     self.speed = 1 + level * 0.1 + randint(-10,10) * 0.04
     self.danger = 0
@@ -337,7 +337,7 @@ class Monster(Actor):
     self.x, self.y = g.checkpoints[self.checkpoint]
     if level % 3 == 0:
       self.square = True
-      self.armor = (self.armor + 1) * 2
+      self.armor = max(1, self.armor * 2)
       self.hp *= 0.5
       self.speed *= 0.8
     else:
