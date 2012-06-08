@@ -133,7 +133,7 @@ class Globals(object):
       g.checkpoints.reverse()
 
     # global gravity
-    if randint(0,3) == 0:
+    if g.easy or randint(0,3) == 0:
       g.gravity = (0, 0)
     else:
       g.gravity = (0, 0.001 * randint(0, min(100, g.level * 3)))
@@ -240,18 +240,19 @@ def run():
       g.towers.sort(key=lambda tower: -tower.size)
       for i, tower in enumerate(tuple(g.towers)):
         tower.walk()
-        # gravitational attraction:
-        for other in g.towers[i+1:]:
-          angle = atan2(tower.y - other.y, tower.x - other.x)
-          distance = tower.distance(other.x, other.y)
-          if distance > 10 and distance < 200:
-            g1 = tower.size + 1
-            g2 = other.size + 1
-            attraction = (g1 * g2) / distance**2
-            tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
-            tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
-            other.vx += cos(angle) * attraction / g2 / other.pinhead
-            other.vy += sin(angle) * attraction / g2 / other.pinhead
+        if not g.easy:
+          # gravitational attraction:
+          for other in g.towers[i+1:]:
+            angle = atan2(tower.y - other.y, tower.x - other.x)
+            distance = tower.distance(other.x, other.y)
+            if distance > 10 and distance < 200:
+              g1 = tower.size + 1
+              g2 = other.size + 1
+              attraction = (g1 * g2) / distance**2
+              tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
+              tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
+              other.vx += cos(angle) * attraction / g2 / other.pinhead
+              other.vy += sin(angle) * attraction / g2 / other.pinhead
     draw()
 
 
@@ -475,7 +476,7 @@ class Tower(Actor):
         + (self.size / 10000.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
-    self.pinhead = 4 if all(color in range(76, 128) for color in self.color) else 1
+    self.pinhead = 7 if all(color in range(76, 128) for color in self.color) else 1
     self.inertia = 4.0 / (4 + self.size * self.pinhead / 100.0)
     if self.color == (0, 0, 0):
       self.armor_pierce = 1
@@ -501,7 +502,7 @@ class Tower(Actor):
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.pinhead > 1:
-      self.stats.append("pin head bonus: +300% inertia")
+      self.stats.append("pin head bonus: +600% inertia")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.stats.append("purity bonus: +2 attacks/second")
     self.stats.append("")
