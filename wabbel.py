@@ -132,7 +132,7 @@ class Globals(object):
       g.checkpoints.reverse()
 
     # global gravity
-    if randint(0,3) == 0:
+    if g.easy or randint(0,3) == 0:
       g.gravity = (0, 0)
     else:
       g.gravity = (0, 0.001 * randint(0, min(100, g.level * 3)))
@@ -234,18 +234,19 @@ def run():
       g.towers.sort(key=lambda tower: -tower.size)
       for i, tower in enumerate(tuple(g.towers)):
         tower.walk()
-        # gravitational attraction:
-        for other in g.towers[i+1:]:
-          angle = atan2(tower.y - other.y, tower.x - other.x)
-          distance = tower.distance(other.x, other.y)
-          if distance > 10 and distance < 200:
-            g1 = tower.size + 1
-            g2 = other.size + 1
-            attraction = (g1 * g2) / distance**2
-            tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
-            tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
-            other.vx += cos(angle) * attraction / g2 / other.pinhead
-            other.vy += sin(angle) * attraction / g2 / other.pinhead
+        if not g.easy:
+          # gravitational attraction:
+          for other in g.towers[i+1:]:
+            angle = atan2(tower.y - other.y, tower.x - other.x)
+            distance = tower.distance(other.x, other.y)
+            if distance > 10 and distance < 200:
+              g1 = tower.size + 1
+              g2 = other.size + 1
+              attraction = (g1 * g2) / distance**2
+              tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
+              tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
+              other.vx += cos(angle) * attraction / g2 / other.pinhead
+              other.vy += sin(angle) * attraction / g2 / other.pinhead
     draw()
 
 
