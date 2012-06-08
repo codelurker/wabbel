@@ -438,7 +438,7 @@ class Tower(Actor):
         + (self.size / 10000.0))
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.shot_delay = 1 / (1 / (self.shot_delay) + 2)
-    self.pinhead = 4 if all(color in range(76, 128) for color in self.color) else 1
+    self.pinhead = 7 if all(color in range(76, 128) for color in self.color) else 1
     self.inertia = 4.0 / (4 + self.size * self.pinhead / 100.0)
     if self.color == (0, 0, 0):
       self.armor_pierce = 1
@@ -464,7 +464,7 @@ class Tower(Actor):
     if self.color == (0, 0, 0):
       self.stats.append("black hole bonus: armor piercing")
     if self.pinhead > 1:
-      self.stats.append("pin head bonus: +300% inertia")
+      self.stats.append("pin head bonus: +600% inertia")
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.stats.append("purity bonus: +2 attacks/second")
     self.stats.append("")
