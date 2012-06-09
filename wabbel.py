@@ -254,11 +254,18 @@ def draw_game():
 
   dark = [int(clr*0.5) for clr in g.level_color]
   checkpoints = tuple((dot[0] + g.shake[0], dot[1] + g.shake[1]) for dot in g.checkpoints)
-  pygame.draw.lines(g.screen, dark, False, checkpoints, 10)
-  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 2)
+  if (0, 0) in g.checkpoints:
+    for dot1, dot2 in zip(g.checkpoints, g.checkpoints[1:]):
+      if (0, 0) not in (dot1, dot2):
+        pygame.draw.line(g.screen, dark, dot1, dot2, 10)
+        pygame.draw.line(g.screen, g.level_color, dot1, dot2, 2)
+  else:
+    pygame.draw.lines(g.screen, dark, False, checkpoints, 10)
+    pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 2)
   for dot in checkpoints:
-    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 8, 0)
-    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 8, 1)
+    if dot != (0, 0):
+      pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 8, 0)
+      pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 8, 1)
 
   for mob in g.mobs:
     mob.draw()
@@ -366,6 +373,8 @@ class Monster(Actor):
           if g.hp <= 0:
             g.lose()
       else:
+        while g.checkpoints[self.checkpoint] != (0, 0):
+          self.checkpoint += 1
         self.checkpoint += 1
         self.x, self.y = g.checkpoints[self.checkpoint]
 
