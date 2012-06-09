@@ -123,9 +123,9 @@ class Globals(object):
     g.checkpoints = [(int(d[0] * g.w / 10), int(d[1] * g.h / 10)) for d in
         choice(g.level_layouts)]
     if randint(0,1) == 0:
-      g.checkpoints = [(g.w-d[0], d[1]) for d in g.checkpoints]
+      g.checkpoints = [d if d == (0, 0) else (g.w-d[0], d[1]) for d in g.checkpoints]
     if randint(0,1) == 0:
-      g.checkpoints = [(d[0], g.h-d[1]) for d in g.checkpoints]
+      g.checkpoints = [d if d == (0, 0) else (d[0], g.h-d[1]) for d in g.checkpoints]
     if randint(0,1) == 0:
       g.checkpoints.reverse()
 
