@@ -62,6 +62,7 @@ class Globals(object):
         [(0, 4), (4, 2), (4.5, 5), (2, 7), (3, 9), (8, 8), (5.5, 5), (7, 0)],
         [(6, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
         [(0, 3.33), (4, 3.33), (5, 2), (7, 2), (3.25, 7), (7, 7), (8.5, 5), (0, 5)],
+        [(0, 5), (2, 4), (3, 5), (5, 4), (7, 6), (6, 8), (4, 6), (3.8, 3), (5, 0)],
     ]
     g.max_drag_dist = 100
     g.maxfps = 30
@@ -75,7 +76,7 @@ class Globals(object):
       g.name = "unknown"
     g.profile = '--profile' in sys.argv
     g.range_color = (32, 32, 32)
-    g.version = "0.1"
+    g.version = "0.2"
     g.waves_per_level = 10
     g.w, g.h = 800, 600
 
