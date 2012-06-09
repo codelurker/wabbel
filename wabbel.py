@@ -230,7 +230,7 @@ def run_game():
           if int(distance) in (range(25, 50) if g.easy else range(10,200)):
             g1 = tower.size + 1
             g2 = other.size + 1
-            attraction = (g1 * g2) / distance**2
+            attraction = min(3, (g1 * g2) / distance**2)
             tower.vx -= cos(angle) * attraction / g1 / tower.pinhead
             tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
             other.vx += cos(angle) * attraction / g2 / other.pinhead
