@@ -142,8 +142,8 @@ class Globals(object):
         # vertical gravity instead
         g.gravity = (choice([1, -1]) * g.gravity[1], 0)
 
-  def log(g, obj):
-    g.logged.append(str(obj))
+  def log(g, *things):
+    g.logged.extend([str(obj) for obj in things])
 
   def lose(g):
     g.hp = 0
@@ -161,10 +161,7 @@ class Globals(object):
       f = open(g.highscorefile, "w")
       f.write("\n".join(highscores) + "\n")
 
-    g.log(" ")
-    g.log("Top 10:")
-    for score, _ in zip(highscores, range(10)):
-      g.log(score)
+    g.log(" ", "Top 10:", *highscores[:10])
 
 
 def run():
@@ -581,7 +578,7 @@ def keypress(key):
   if key == K_ESCAPE:
     raise SystemExit()
   elif key == K_F1:
-    [g.log(line) for line in __doc__.split("\n")]
+    g.log(*__doc__.split("\n")[8:])
   elif key == K_F8:
     g.reset_game()
   elif key == K_F11:
