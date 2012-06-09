@@ -58,43 +58,43 @@ class Globals(object):
     Variables that are initialized here never changed, or only changed once
     inside the run() function.
     """
-    g.version = "0.1"
-    g.highscorefile = os.path.expanduser("~/.wabbel_highscore")
-    g.maxfps = 30
-    g.w, g.h = 800, 600
-    g.profile = '--profile' in sys.argv
+    g.clock = None
+    g.color_step = 12
     g.easy = '--easy' in sys.argv
-    g.fullscreen = '--fullscreen' in sys.argv
-    try:
-      g.name = os.environ.get("USER", getpass.getuser())
-    except:
-      g.name = "unknown"
     g.font_name = None
+    g.font = None
     g.font_size = 16, 24
-    g.nextwavestep = 1
-    g.waves_per_level = 10
-    g.range_color = (32, 32, 32)
+    g.fullscreen = '--fullscreen' in sys.argv
+    g.growth_per_kill = 1
+    g.growth_per_shot = 0.05
+    g.highscorefile = os.path.expanduser("~/.wabbel_highscore")
+    g.hp_cost = 0.5 if g.easy else 1
+    g.hp_damage = 0.3 if g.easy else 0.6
+    g.hp_per_monster = 0.3
+    g.hpregeneration = 0
     g.level_layouts = [
         [(0, 7), (4, 5), (5, 9), (9.5, 8), (7, 2), (0, 3)],
         [(4, 0), (4.4, 5), (2, 7), (3, 9), (8, 8), (5.6, 5), (6, 0)],
         [(1, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
         [(0, 4), (3.5, 4), (5, 2), (7, 2), (3, 7), (7, 7), (9, 5), (0, 5)],
     ]
-    g.growth_per_shot = 0.05
-    g.growth_per_kill = 1
-    g.hpregeneration = 0
-    g.hp_per_monster = 0.3
-    g.hp_cost = 0.5 if g.easy else 1
-    g.hp_damage = 0.3 if g.easy else 0.6
-    g.monster_min_speed = 0.3
-    g.monster_min_armor = 0.5
-    g.min_hp_for_buying = 2
-    g.color_step = 12
-    g.clock = None
-    g.font = None
-    g.smallfont = None
     g.max_drag_dist = 100
+    g.maxfps = 30
     g.max_towers = 20
+    g.min_hp_for_buying = 2
+    g.monster_min_armor = 0.5
+    g.monster_min_speed = 0.3
+    try:
+      g.name = os.environ.get("USER", getpass.getuser())
+    except:
+      g.name = "unknown"
+    g.nextwavestep = 1
+    g.profile = '--profile' in sys.argv
+    g.range_color = (32, 32, 32)
+    g.smallfont = None
+    g.version = "0.1"
+    g.waves_per_level = 10
+    g.w, g.h = 800, 600
     g.reset_game()
 
   def reset_game(g):
@@ -102,21 +102,21 @@ class Globals(object):
     Variables that are initialized here are changed continuously in the course
     of the game and are reset to their defaults when a new game is started.
     """
-    g.shake = (0, 0)
-    g.shake_until = 0
+    g.active = None
+    g.drag = None
+    g.hp = 10
+    g.level = 0
     g.logged = deque(maxlen=30)
+    g.maxhp = g.hp
+    g.mobs = []
     g.nextwave = 200
     g.nextwavemax = g.nextwave
-    g.hp = 10
-    g.maxhp = g.hp
-    g.level = 0
-    g.score = 0
     g.pause = False
-    g.drag = None
-    g.active = None
-    g.mobs = []
-    g.waves = list()
+    g.score = 0
+    g.shake = (0, 0)
+    g.shake_until = 0
     g.towers = list()
+    g.waves = list()
     g.change_level()
 
   def change_level(g):
