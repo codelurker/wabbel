@@ -58,10 +58,11 @@ class Globals(object):
     g.hp_damage = 0.3 if g.easy else 0.6
     g.hp_per_monster = 0.3
     g.level_layouts = [
-        [(0, 7), (4, 5), (5, 9), (9.5, 8), (7, 2), (0, 3)],
-        [(4, 0), (4.4, 5), (2, 7), (3, 9), (8, 8), (5.6, 5), (6, 0)],
-        [(1, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
-        [(0, 4), (3.5, 4), (5, 2), (7, 2), (3, 7), (7, 7), (9, 5), (0, 5)],
+        [(0, 7), (3, 5), (4, 5), (4, 9), (9.5, 9), (7, 5), (7, 4), (0, 3.5)],
+        [(0, 4), (4, 2), (4.5, 5), (2, 7), (3, 9), (8, 8), (5.5, 5), (7, 0)],
+        [(6, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
+        [(0, 3.33), (4, 3.33), (5, 2), (7, 2), (3.25, 7), (7, 7), (8.5, 5), (0, 5)],
+        [(0, 5), (2, 4), (3, 5), (5, 4), (7, 6), (6, 8), (4, 6), (3.8, 3), (5, 0)],
     ]
     g.max_drag_dist = 100
     g.maxfps = 30
@@ -75,7 +76,7 @@ class Globals(object):
       g.name = "unknown"
     g.profile = '--profile' in sys.argv
     g.range_color = (32, 32, 32)
-    g.version = "0.1"
+    g.version = "0.2"
     g.waves_per_level = 10
     g.w, g.h = 800, 600
 
@@ -417,7 +418,6 @@ class Monster(Actor):
   def damage(self, damage, tower):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
     self.hp -= damage
-    self.color = _scale_color(self.original_color, self.hp / self.maxhp)
     self.color = [max(0, min(255, int(c * self.hp / self.maxhp))) for c in self.original_color]
     self.speed -= tower.freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed *
