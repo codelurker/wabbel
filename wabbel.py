@@ -163,9 +163,7 @@ def run_game():
   pygame.init()
   pygame.font.init()
   pygame.key.set_repeat(180, 80)
-  flags = pygame.DOUBLEBUF
-  if g.fullscreen:
-    flags |= pygame.FULLSCREEN
+  flags = DOUBLEBUF | (g.fullscreen and FULLSCREEN)
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
   g.font_small = pygame.font.Font(g.font_name, g.font_size[0])
   g.font = pygame.font.Font(g.font_name, g.font_size[1])
