@@ -40,16 +40,14 @@ tau = 2 * pi
 
 
 class Globals(object):
-  def __init__(g):
+  def __init__(g):  # "g" instead of "self" used for consistency reasons
     """
-    Variables that are initialized here never changed, or only changed once
-    inside the run() function.
+    Variables that are initialized here never change, apart of the
+    ones which only make sense to be defined in run_game().
     """
-    g.clock = None
     g.color_step = 12
     g.easy = '--easy' in sys.argv
     g.font_name = None
-    g.font = None
     g.font_size = 16, 24
     g.fullscreen = '--fullscreen' in sys.argv
     g.growth_per_kill = 1
@@ -76,16 +74,22 @@ class Globals(object):
       g.name = "unknown"
     g.profile = '--profile' in sys.argv
     g.range_color = (32, 32, 32)
-    g.smallfont = None
     g.version = "0.1"
     g.waves_per_level = 10
     g.w, g.h = 800, 600
+
+    # initialized in run_game()
+    g.clock = None
+    g.font = None
+    g.font_small = None
+    g.screen = None
+
     g.reset_game()
 
   def reset_game(g):
     """
-    Variables that are initialized here are changed continuously in the course
-    of the game and are reset to their defaults when a new game is started.
+    Variables that are initialized here are modified throughout the game and
+    are reset to their defaults when a new game is started.
     """
     g.active = None
     g.drag = None
@@ -152,7 +156,7 @@ class Globals(object):
     g.log(" ", "Top 10:", *highscores[:10])
 
 
-def run():
+def run_game():
   """
   Start the game, initialize pygame and run the input/draw loop
   """
@@ -163,11 +167,9 @@ def run():
   if g.fullscreen:
     flags |= pygame.FULLSCREEN
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
-  g.smallfont = pygame.font.Font(g.font_name, g.font_size[0])
+  g.font_small = pygame.font.Font(g.font_name, g.font_size[0])
   g.font = pygame.font.Font(g.font_name, g.font_size[1])
-
   g.clock = pygame.time.Clock()
-  g.w, g.h = g.screen.get_size()
   g.log("Welcome! Press F1 to display help.")
 
   next_log_refresh = 0
@@ -233,13 +235,13 @@ def run():
             tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
             other.vx += cos(angle) * attraction / g2 / other.pinhead
             other.vy += sin(angle) * attraction / g2 / other.pinhead
-    draw()
+    draw_game()
     if not g.pause:
       g.dt = time.time() - time_before
       g.game_time += g.dt
 
 
-def draw():
+def draw_game():
   """
   Draw the level, the UI and the actors.
   """
@@ -286,7 +288,7 @@ def draw():
 
     x, y = g.w - 20, 80
     for line in g.active.stats:
-      text = g.smallfont.render(line, 1, (255, 255, 255))
+      text = g.font_small.render(line, 1, (255, 255, 255))
       g.screen.blit(text, (x - text.get_rect().width, y))
       y += text.get_rect().height + 2
 
@@ -676,8 +678,8 @@ if __name__ == '__main__':
     if g.profile:
       import cProfile
       import pstats
-      exit_code = cProfile.run('sys.modules[__name__].run()', '/tmp/profile')
+      exit_code = cProfile.run('sys.modules[__name__].run_game()', '/tmp/profile')
       p = pstats.Stats('/tmp/profile')
       p.strip_dirs().sort_stats('cumulative').print_callees()
     else:
-      run()
+      run_game()
