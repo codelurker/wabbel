@@ -34,36 +34,20 @@ from pygame.locals import *
 from random import random, randint, choice, shuffle
 tau = 2 * pi
 
-# -- INDEX --
-# class Globals
-# def run()
-# def draw()
-# class Actor
-# class Monster(Actor)
-# class Tower(Actor)
-# class Wave
-# def keypress(key)
-# def keyhold(pressed)
-# def click(action, pos, button)
-
 # -- TODO --
 # Add more types of enemies?
-# Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
 # Maps that morph and breathe, with edge points spiraling in and out
 
 
 class Globals(object):
-  def __init__(g):
+  def __init__(g):  # "g" instead of "self" used for consistency reasons
     """
-    Variables that are initialized here never changed, or only changed once
-    inside the run() function.
+    Variables that are initialized here never change, apart of the
+    ones which only make sense to be defined in run_game().
     """
-    g.buttons = list()
-    g.clock = None
     g.color_step = 12
     g.easy = '--easy' in sys.argv
     g.font_name = None
-    g.font = None
     g.font_size = 16, 24
     g.fullscreen = '--fullscreen' in sys.argv
     g.growth_per_kill = 1
@@ -72,7 +56,6 @@ class Globals(object):
     g.hp_cost = 0.5 if g.easy else 1
     g.hp_damage = 0.3 if g.easy else 0.6
     g.hp_per_monster = 0.3
-    g.hpregeneration = 0
     g.level_layouts = [
         [(0, 7), (4, 5), (5, 9), (9.5, 8), (7, 2), (0, 3)],
         [(4, 0), (4.4, 5), (2, 7), (3, 9), (8, 8), (5.6, 5), (6, 0)],
@@ -89,28 +72,36 @@ class Globals(object):
       g.name = os.environ.get("USER", getpass.getuser())
     except:
       g.name = "unknown"
-    g.nextwavestep = 1
     g.profile = '--profile' in sys.argv
     g.range_color = (32, 32, 32)
-    g.smallfont = None
     g.version = "0.1"
     g.waves_per_level = 10
     g.w, g.h = 800, 600
+
+    # initialized in run_game()
+    g.buttons = list()
+    g.clock = None
+    g.font = None
+    g.font_small = None
+    g.screen = None
+
     g.reset_game()
 
   def reset_game(g):
     """
-    Variables that are initialized here are changed continuously in the course
-    of the game and are reset to their defaults when a new game is started.
+    Variables that are initialized here are modified throughout the game and
+    are reset to their defaults when a new game is started.
     """
     g.active = None
     g.drag = None
+    g.dt = 0
+    g.game_time = 0
     g.hp = 10
     g.level = 0
     g.logged = deque(maxlen=30)
     g.maxhp = g.hp
     g.mobs = []
-    g.nextwave = 200
+    g.nextwave = 6.6
     g.nextwavemax = g.nextwave
     g.pause = False
     g.score = 0
@@ -166,7 +157,7 @@ class Globals(object):
     g.log(" ", "Top 10:", *highscores[:10])
 
 
-def run():
+def run_game():
   """
   Start the game, initialize pygame and run the input/draw loop
   """
@@ -177,11 +168,9 @@ def run():
   if g.fullscreen:
     flags |= pygame.FULLSCREEN
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
-  g.smallfont = pygame.font.Font(g.font_name, g.font_size[0])
+  g.font_small = pygame.font.Font(g.font_name, g.font_size[0])
   g.font = pygame.font.Font(g.font_name, g.font_size[1])
-
   g.clock = pygame.time.Clock()
-  g.w, g.h = g.screen.get_size()
   g.log("Welcome! Press F1 to display help.")
 
   for i, color, key in zip(range(3), [(200,0,0), (0,200,0), (0,0,255)],
@@ -192,6 +181,7 @@ def run():
   next_log_refresh = 0
 
   while True:
+    time_before = time.time()
     g.clock.tick(g.maxfps)
     if next_log_refresh <= time.time():
       next_log_refresh = time.time() + 1
@@ -208,7 +198,6 @@ def run():
 
     # Handle waves, monsters and towers:
     if g.hp > 0 and not g.pause:
-      g.hp = min(g.maxhp, g.hp + g.hpregeneration)
       if g.towers or g.level:
         if g.level and g.level % g.waves_per_level == 0:
           if g.mobs:
@@ -217,7 +206,7 @@ def run():
             g.change_level()
             g.nextwave = 0
 
-        g.nextwave -= g.nextwavestep
+        g.nextwave -= g.dt
         if g.nextwave <= 0:
           g.nextwave = g.nextwavemax
           g.level += 1
@@ -252,10 +241,13 @@ def run():
             tower.vy -= sin(angle) * attraction / g1 / tower.pinhead
             other.vx += cos(angle) * attraction / g2 / other.pinhead
             other.vy += sin(angle) * attraction / g2 / other.pinhead
-    draw()
+    draw_game()
+    if not g.pause:
+      g.dt = time.time() - time_before
+      g.game_time += g.dt
 
 
-def draw():
+def draw_game():
   """
   Draw the level, the UI and the actors.
   """
@@ -263,17 +255,16 @@ def draw():
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
 
-  if g.shake_until > time.time():
+  if g.shake_until > g.game_time:
     g.shake = (randint(-3,3), randint(-3,3))
 
   dark = [int(clr*0.5) for clr in g.level_color]
   checkpoints = tuple((dot[0] + g.shake[0], dot[1] + g.shake[1]) for dot in g.checkpoints)
-  pygame.draw.lines(g.screen, dark, False, checkpoints, 24)
+  pygame.draw.lines(g.screen, dark, False, checkpoints, 10)
+  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 2)
   for dot in checkpoints:
-    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 12, 0)
-  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 20)
-  for dot in checkpoints:
-    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 10, 0)
+    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 8, 0)
+    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 8, 1)
 
   for mob in g.mobs:
     mob.draw()
@@ -303,7 +294,7 @@ def draw():
 
     x, y = g.w - 20, 80
     for line in g.active.stats:
-      text = g.smallfont.render(line, 1, (255, 255, 255))
+      text = g.font_small.render(line, 1, (255, 255, 255))
       g.screen.blit(text, (x - text.get_rect().width, y))
       y += text.get_rect().height + 2
 
@@ -395,20 +386,21 @@ class Monster(Actor):
     self.original_armor = self.armor
 
   def walk(self):
-    self.phase = (self.phase + tau / 24.0) % tau
+    self.phase = (self.phase + 30 * g.dt * tau / len(self.steps)) % tau
     point1 = g.checkpoints[self.checkpoint]
     point2 = g.checkpoints[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
-    self.x += cos(angle) * self.speed
-    self.y += sin(angle) * self.speed
-    self.danger += self.speed
-    if abs(point2[0] - self.x) < self.speed and \
-        abs(point2[1] - self.y) < self.speed * 2:
+    step = self.speed * g.dt * 30
+    self.x += cos(angle) * step
+    self.y += sin(angle) * step
+    self.danger += self.speed * g.dt
+    if abs(point2[0] - self.x) < step * 2 and \
+        abs(point2[1] - self.y) < step * 2:
       if self.checkpoint >= len(g.checkpoints) - 2:
         self.hp = 0
         if g.hp > 0:
           g.hp -= g.hp_damage
-          g.shake_until = max(g.shake_until, time.time() + 2.0)
+          g.shake_until = max(g.shake_until, g.game_time + 2.0)
           if g.hp <= 0:
             g.lose()
       else:
@@ -421,7 +413,7 @@ class Monster(Actor):
       pygame.draw.rect(g.screen, self.color, Rect(x-4, y-4, 8, 8), 3)
     else:
       pygame.draw.polygon(g.screen, self.color, [(x+p, y+q) for p, q in
-        self.rotated_cross[int(self.phase / tau * 24)]], 1)
+        self.rotated_cross[int(self.phase / tau * len(self.steps))]], 1)
 
   def damage(self, damage, tower):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
@@ -527,16 +519,16 @@ class Tower(Actor):
         angle = atan2(mouse[1] - self.y, mouse[0] - self.x)
         xtarget = self.x + g.max_drag_dist * cos(angle)
         ytarget = self.y + g.max_drag_dist * sin(angle)
-      self.vx += (xtarget - self.x) / 30 * self.inertia
-      self.vy += (ytarget - self.y) / 30 * self.inertia
+      self.vx += (xtarget - self.x) / 30 * self.inertia * g.dt * 30
+      self.vy += (ytarget - self.y) / 30 * self.inertia * g.dt * 30
     else:
       if self.y + self.radius < g.h:
-        self.vx += g.gravity[0] / self.pinhead
-        self.vy += g.gravity[1] / self.pinhead
+        self.vx += g.gravity[0] / self.pinhead * g.dt * 30
+        self.vy += g.gravity[1] / self.pinhead * g.dt * 30
 
-    self.phase = (self.phase + tau/24) % tau
-    self.x = min(g.w, max(0, self.x + self.vx))
-    self.y = min(g.h, max(0, self.y + self.vy))
+    self.phase = (self.phase + tau/24*30*g.dt) % tau
+    self.x = min(g.w, max(0, self.x + self.vx * g.dt * 30))
+    self.y = min(g.h, max(0, self.y + self.vy * g.dt * 30))
     self.vx *= 0.97
     self.vy *= 0.97
     if self.x - self.radius < 0 and self.vx < 0 or \
@@ -546,7 +538,7 @@ class Tower(Actor):
         self.y + self.radius > g.h and self.vy > 0:
       self.vy *= -1
 
-    if self.last_shot + self.shot_delay < time.time():
+    if self.last_shot + self.shot_delay < g.game_time:
       self.shoot()
 
     if self.support > 0:
@@ -583,7 +575,7 @@ class Tower(Actor):
     if not mobs:
       return
     self.size += g.growth_per_shot
-    self.last_shot = time.time()
+    self.last_shot = g.game_time
     target = max(mobs, key=lambda mob: mob.danger)
 
     self.target_point = target.pos
@@ -607,10 +599,10 @@ class Wave(object):
     self.monsters_left = 10
 
   def tick(self):
-    if self.last_send + self.delay < time.time():
+    if self.last_send + self.delay < g.game_time:
       g.mobs.append(Monster(self.level))
       self.monsters_left -= 1
-      self.last_send = time.time()
+      self.last_send = g.game_time
 
 
 def keypress(key):
@@ -663,13 +655,13 @@ def keypress(key):
 
 def keyhold(pressed):
   if (pressed[K_j] or pressed[K_s] or pressed[K_DOWN]) and g.active:
-    g.active.vy += 1.0 * g.active.inertia
+    g.active.vy += 30.0 * g.active.inertia * g.dt
   if (pressed[K_k] or pressed[K_w] or pressed[K_UP]) and g.active:
-    g.active.vy -= 1.0 * g.active.inertia
+    g.active.vy -= 30.0 * g.active.inertia * g.dt
   if (pressed[K_h] or pressed[K_a] or pressed[K_LEFT]) and g.active:
-    g.active.vx -= 1.0 * g.active.inertia
+    g.active.vx -= 30.0 * g.active.inertia * g.dt
   if (pressed[K_l] or pressed[K_d] or pressed[K_RIGHT]) and g.active:
-    g.active.vx += 1.0 * g.active.inertia
+    g.active.vx += 30.0 * g.active.inertia * g.dt
 
 
 def click(action, pos, button):
@@ -728,8 +720,8 @@ if __name__ == '__main__':
     if g.profile:
       import cProfile
       import pstats
-      exit_code = cProfile.run('sys.modules[__name__].run()', '/tmp/profile')
+      exit_code = cProfile.run('sys.modules[__name__].run_game()', '/tmp/profile')
       p = pstats.Stats('/tmp/profile')
       p.strip_dirs().sort_stats('cumulative').print_callees()
     else:
-      run()
+      run_game()
