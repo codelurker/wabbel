@@ -49,6 +49,7 @@ from random import randint, choice, shuffle
 # Add more types of enemies?
 # Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
 # Maps that morph and breathe, with edge points spiraling in and out
+# Grow when shooting, even if the bubble didn't kill anything?
 
 
 class Globals(object):
