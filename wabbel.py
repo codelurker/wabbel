@@ -50,7 +50,6 @@ tau = 2 * pi
 # Add more types of enemies?
 # Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
 # Maps that morph and breathe, with edge points spiraling in and out
-# Grow when shooting, even if the bubble didn't kill anything?
 
 
 class Globals(object):
@@ -81,6 +80,8 @@ class Globals(object):
         [(1, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
         [(0, 4), (3.5, 4), (5, 2), (7, 2), (3, 7), (7, 7), (9, 5), (0, 5)],
     ]
+    g.growth_per_shot = 0.05
+    g.growth_per_kill = 1
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
     g.hp_cost = 0.5 if g.easy else 1
@@ -475,7 +476,7 @@ class Tower(Actor):
     if self.yellow == 0 and self.magenta == 0 and self.cyan == 0:
       self.stats.append("purity bonus: +2 attacks/second")
     self.stats.append("")
-    self.stats.append("kills: %d" % self.size)
+    self.stats.append("power level: %d" % self.size)
     self.stats.append("radius: %d" % self.radius)
 
   def walk(self):
@@ -543,6 +544,7 @@ class Tower(Actor):
     mobs = list(self._get_monsters_in_range(self.range, self.x, self.y))
     if not mobs:
       return
+    self.size += g.growth_per_shot
     self.last_shot = time.time()
     target = max(mobs, key=lambda mob: mob.danger)
 
@@ -550,7 +552,7 @@ class Tower(Actor):
 
     for mob in self._get_monsters_in_range(self.radius, target.x, target.y):
       if mob.damage(self.damage + self.bonus_damage, self):
-        self.size += 1
+        self.size += g.growth_per_kill
         self.update_stats()
         g.hp = min(g.maxhp, g.hp + g.hp_per_monster)
         g.score += mob.level
