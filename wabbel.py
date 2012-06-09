@@ -262,12 +262,11 @@ def draw():
 
   dark = [int(clr*0.5) for clr in g.level_color]
   checkpoints = tuple((dot[0] + g.shake[0], dot[1] + g.shake[1]) for dot in g.checkpoints)
-  pygame.draw.lines(g.screen, dark, False, checkpoints, 24)
+  pygame.draw.lines(g.screen, dark, False, checkpoints, 10)
+  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 2)
   for dot in checkpoints:
-    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 12, 0)
-  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 20)
-  for dot in checkpoints:
-    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 10, 0)
+    pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 8, 0)
+    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 8, 1)
 
   for mob in g.mobs:
     mob.draw()
