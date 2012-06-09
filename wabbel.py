@@ -585,11 +585,12 @@ def keypress(key):
   elif key == K_d:
     if pygame.key.get_mods() & KMOD_SHIFT and g.active:
       g.towers.remove(g.active)
-      g.active = None
+      g.active = g.towers[0] if g.towers else None
       g.drag = None
   elif key in (K_c, K_F2):
     if len(g.towers) < g.max_towers:
       g.towers.append(Tower())
+      g.active = g.towers[-1]
   elif key == K_SPACE:
     g.pause ^= True
   elif key in range(K_1, K_9 + 1):
