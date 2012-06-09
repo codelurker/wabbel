@@ -526,9 +526,7 @@ class Tower(Actor):
 
   def _get_monsters_in_range(self, r, x, y):
     for mob in g.mobs:
-      if mob.hp > 0 and \
-          abs(mob.x - x) < r and \
-          abs(mob.y - y) < r and \
+      if mob.hp > 0 and abs(mob.x - x) < r and abs(mob.y - y) < r and \
           mob.distance(x, y) < r:
         yield mob
 
