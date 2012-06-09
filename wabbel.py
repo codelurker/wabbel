@@ -379,6 +379,7 @@ class Monster(Actor):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
     self.hp -= damage
     self.color = _scale_color(self.original_color, self.hp / self.maxhp)
+    self.color = [max(0, min(255, int(c * self.hp / self.maxhp))) for c in self.original_color]
     self.speed -= tower.freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed *
       g.monster_min_speed, self.speed))
@@ -638,12 +639,6 @@ def click(action, pos, button):
       g.drag = None
   elif button == 3:
     g.active = None
-
-
-def _scale_color(color, factor):
-  return (max(0, min(255, int(color[0] * factor))),
-      max(0, min(255, int(color[1] * factor))),
-      max(0, min(255, int(color[2] * factor))))
 
 
 def _draw_bar(x, y, length, width, color):
