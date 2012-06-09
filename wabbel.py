@@ -20,6 +20,7 @@ Tab: Select next bubble
 0-9: Select certain bubbles, ordered by size
 F3: Send the next wave of enemies
 F11: Toggle fullscreen (unix only)
+F5: Clear the message log
 Drag&Drop, Arrow Keys or hjkl: Move the active bubble
 Escape: quit"""
 
