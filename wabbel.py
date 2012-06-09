@@ -32,6 +32,7 @@ from collections import deque
 from math import sin, cos, atan2, pi, sqrt
 from pygame.locals import *
 from random import randint, choice, shuffle
+tau = 2 * pi
 
 # -- INDEX --
 # class Globals
@@ -80,8 +81,6 @@ class Globals(object):
         [(1, 0), (2, 4), (8, 3), (4, 9), (8, 6), (7, 10)],
         [(0, 4), (3.5, 4), (5, 2), (7, 2), (3, 7), (7, 7), (9, 5), (0, 5)],
     ]
-    g.monster_points = [(-5,-1), (-1,-1), (-1,-5), (1,-5), (1,-1), (5,-1),
-        (5,1), (1,1), (1,5), (-1,5), (-1,1), (-5,1)]
     g.hpregeneration = 0
     g.hp_per_monster = 0.3
     g.hp_cost = 0.5 if g.easy else 1
@@ -327,6 +326,13 @@ class Actor(object):
 
 
 class Monster(Actor):
+  # Generate the rotating model of monster 1
+  cross = [(-5,-1), (-1,-1), (-1,-5), (1,-5), (1,-1), (5,-1), (5,1), (1,1),
+      (1,5), (-1,5), (-1,1), (-5,1)]
+  steps = [i * tau / 24 for i in range(24)]
+  rotated_cross = [[(p[0] * sin(a) + p[1] * cos(a), -p[0] * cos(a) + p[1] * sin(a))
+    for p in cross] for a in steps]
+
   def __init__(self, level):
     self.level = level
     self.hp = 8 * level
@@ -351,7 +357,7 @@ class Monster(Actor):
     self.original_armor = self.armor
 
   def walk(self):
-    self.phase = (self.phase + pi / 12.0) % (2 * pi)
+    self.phase = (self.phase + tau / 24.0) % tau
     point1 = g.checkpoints[self.checkpoint]
     point2 = g.checkpoints[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
@@ -376,9 +382,8 @@ class Monster(Actor):
     if self.square:
       pygame.draw.rect(g.screen, self.color, Rect(x-4, y-4, 8, 8), 3)
     else:
-      points = [(x + p[0] * sin(self.phase) + p[1] * cos(self.phase), y - p[0]
-        * cos(self.phase) + p[1] * sin(self.phase)) for p in g.monster_points]
-      pygame.draw.polygon(g.screen, self.color, points, 1)
+      pygame.draw.polygon(g.screen, self.color, [(x+p, y+q) for p, q in
+        self.rotated_cross[int(self.phase / tau * 24)]], 1)
 
   def damage(self, damage, tower):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
@@ -491,7 +496,7 @@ class Tower(Actor):
         self.vx += g.gravity[0] / self.pinhead
         self.vy += g.gravity[1] / self.pinhead
 
-    self.phase = (self.phase + pi/12) % (2*pi)
+    self.phase = (self.phase + tau/24) % tau
     self.x = min(g.w, max(0, self.x + self.vx))
     self.y = min(g.h, max(0, self.y + self.vy))
     self.vx *= 0.97
