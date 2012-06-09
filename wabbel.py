@@ -252,13 +252,14 @@ def draw_game():
   if g.shake_until > g.game_time:
     g.shake = (randint(-3,3), randint(-3,3))
 
-  dark = [int(clr*0.5) for clr in g.level_color]
+  normal = [int(max(0, min(255, 24 * sin(g.game_time) + clr))) for clr in g.level_color]
+  dark = [int(clr*0.5) for clr in normal]
   checkpoints = tuple((dot[0] + g.shake[0], dot[1] + g.shake[1]) for dot in g.checkpoints)
   pygame.draw.lines(g.screen, dark, False, checkpoints, 10)
-  pygame.draw.lines(g.screen, g.level_color, False, checkpoints, 2)
+  pygame.draw.lines(g.screen, normal, False, checkpoints, 2)
   for dot in checkpoints:
     pygame.draw.circle(g.screen, dark, (dot[0], dot[1] + 1), 8, 0)
-    pygame.draw.circle(g.screen, g.level_color, (dot[0], dot[1] + 1), 8, 1)
+    pygame.draw.circle(g.screen, normal, (dot[0], dot[1] + 1), 8, 1)
 
   for mob in g.mobs:
     mob.draw()
