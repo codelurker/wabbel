@@ -375,9 +375,9 @@ class Monster(Actor):
           if g.hp <= 0:
             g.lose()
       else:
-        while g.checkpoints[self.checkpoint] != (0, 0):
-          self.checkpoint += 1
         self.checkpoint += 1
+        if g.checkpoints[self.checkpoint + 1] == (0, 0):
+          self.checkpoint += 2
         self.x, self.y = g.checkpoints[self.checkpoint]
 
   def draw(self):
