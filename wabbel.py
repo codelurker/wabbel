@@ -36,7 +36,6 @@ tau = 2 * pi
 
 # -- TODO --
 # Add more types of enemies?
-# Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
 # Maps that morph and breathe, with edge points spiraling in and out
 
 
@@ -59,7 +58,6 @@ class Globals(object):
     g.hp_cost = 0.5 if g.easy else 1
     g.hp_damage = 0.3 if g.easy else 0.6
     g.hp_per_monster = 0.3
-    g.hpregeneration = 0
     g.level_layouts = [
         [(0, 7), (4, 5), (5, 9), (9.5, 8), (7, 2), (0, 3)],
         [(4, 0), (4.4, 5), (2, 7), (3, 9), (8, 8), (5.6, 5), (6, 0)],
@@ -76,7 +74,6 @@ class Globals(object):
       g.name = os.environ.get("USER", getpass.getuser())
     except:
       g.name = "unknown"
-    g.nextwavestep = 1
     g.profile = '--profile' in sys.argv
     g.range_color = (32, 32, 32)
     g.smallfont = None
@@ -92,12 +89,14 @@ class Globals(object):
     """
     g.active = None
     g.drag = None
+    g.dt = 0
+    g.game_time = 0
     g.hp = 10
     g.level = 0
     g.logged = deque(maxlen=30)
     g.maxhp = g.hp
     g.mobs = []
-    g.nextwave = 200
+    g.nextwave = 6.6
     g.nextwavemax = g.nextwave
     g.pause = False
     g.score = 0
@@ -174,6 +173,7 @@ def run():
   next_log_refresh = 0
 
   while True:
+    time_before = time.time()
     g.clock.tick(g.maxfps)
     if next_log_refresh <= time.time():
       next_log_refresh = time.time() + 1
@@ -190,7 +190,6 @@ def run():
 
     # Handle waves, monsters and towers:
     if g.hp > 0 and not g.pause:
-      g.hp = min(g.maxhp, g.hp + g.hpregeneration)
       if g.towers or g.level:
         if g.level and g.level % g.waves_per_level == 0:
           if g.mobs:
@@ -199,7 +198,7 @@ def run():
             g.change_level()
             g.nextwave = 0
 
-        g.nextwave -= g.nextwavestep
+        g.nextwave -= g.dt
         if g.nextwave <= 0:
           g.nextwave = g.nextwavemax
           g.level += 1
@@ -235,6 +234,9 @@ def run():
             other.vx += cos(angle) * attraction / g2 / other.pinhead
             other.vy += sin(angle) * attraction / g2 / other.pinhead
     draw()
+    if not g.pause:
+      g.dt = time.time() - time_before
+      g.game_time += g.dt
 
 
 def draw():
@@ -245,7 +247,7 @@ def draw():
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
 
-  if g.shake_until > time.time():
+  if g.shake_until > g.game_time:
     g.shake = (randint(-3,3), randint(-3,3))
 
   dark = [int(clr*0.5) for clr in g.level_color]
@@ -344,20 +346,21 @@ class Monster(Actor):
     self.original_armor = self.armor
 
   def walk(self):
-    self.phase = (self.phase + tau / 24.0) % tau
+    self.phase = (self.phase + 30 * g.dt * tau / len(self.steps)) % tau
     point1 = g.checkpoints[self.checkpoint]
     point2 = g.checkpoints[self.checkpoint + 1]
     angle = atan2(point2[1] - point1[1], point2[0] - point1[0])
-    self.x += cos(angle) * self.speed
-    self.y += sin(angle) * self.speed
-    self.danger += self.speed
-    if abs(point2[0] - self.x) < self.speed and \
-        abs(point2[1] - self.y) < self.speed * 2:
+    step = self.speed * g.dt * 30
+    self.x += cos(angle) * step
+    self.y += sin(angle) * step
+    self.danger += self.speed * g.dt
+    if abs(point2[0] - self.x) < step * 2 and \
+        abs(point2[1] - self.y) < step * 2:
       if self.checkpoint >= len(g.checkpoints) - 2:
         self.hp = 0
         if g.hp > 0:
           g.hp -= g.hp_damage
-          g.shake_until = max(g.shake_until, time.time() + 2.0)
+          g.shake_until = max(g.shake_until, g.game_time + 2.0)
           if g.hp <= 0:
             g.lose()
       else:
@@ -370,7 +373,7 @@ class Monster(Actor):
       pygame.draw.rect(g.screen, self.color, Rect(x-4, y-4, 8, 8), 3)
     else:
       pygame.draw.polygon(g.screen, self.color, [(x+p, y+q) for p, q in
-        self.rotated_cross[int(self.phase / tau * 24)]], 1)
+        self.rotated_cross[int(self.phase / tau * len(self.steps))]], 1)
 
   def damage(self, damage, tower):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
@@ -476,16 +479,16 @@ class Tower(Actor):
         angle = atan2(mouse[1] - self.y, mouse[0] - self.x)
         xtarget = self.x + g.max_drag_dist * cos(angle)
         ytarget = self.y + g.max_drag_dist * sin(angle)
-      self.vx += (xtarget - self.x) / 30 * self.inertia
-      self.vy += (ytarget - self.y) / 30 * self.inertia
+      self.vx += (xtarget - self.x) / 30 * self.inertia * g.dt * 30
+      self.vy += (ytarget - self.y) / 30 * self.inertia * g.dt * 30
     else:
       if self.y + self.radius < g.h:
-        self.vx += g.gravity[0] / self.pinhead
-        self.vy += g.gravity[1] / self.pinhead
+        self.vx += g.gravity[0] / self.pinhead * g.dt * 30
+        self.vy += g.gravity[1] / self.pinhead * g.dt * 30
 
-    self.phase = (self.phase + tau/24) % tau
-    self.x = min(g.w, max(0, self.x + self.vx))
-    self.y = min(g.h, max(0, self.y + self.vy))
+    self.phase = (self.phase + tau/24*30*g.dt) % tau
+    self.x = min(g.w, max(0, self.x + self.vx * g.dt * 30))
+    self.y = min(g.h, max(0, self.y + self.vy * g.dt * 30))
     self.vx *= 0.97
     self.vy *= 0.97
     if self.x - self.radius < 0 and self.vx < 0 or \
@@ -495,7 +498,7 @@ class Tower(Actor):
         self.y + self.radius > g.h and self.vy > 0:
       self.vy *= -1
 
-    if self.last_shot + self.shot_delay < time.time():
+    if self.last_shot + self.shot_delay < g.game_time:
       self.shoot()
 
     if self.support > 0:
@@ -532,7 +535,7 @@ class Tower(Actor):
     if not mobs:
       return
     self.size += g.growth_per_shot
-    self.last_shot = time.time()
+    self.last_shot = g.game_time
     target = max(mobs, key=lambda mob: mob.danger)
 
     self.target_point = target.pos
@@ -556,10 +559,10 @@ class Wave(object):
     self.monsters_left = 10
 
   def tick(self):
-    if self.last_send + self.delay < time.time():
+    if self.last_send + self.delay < g.game_time:
       g.mobs.append(Monster(self.level))
       self.monsters_left -= 1
-      self.last_send = time.time()
+      self.last_send = g.game_time
 
 
 def keypress(key):
@@ -612,13 +615,13 @@ def keypress(key):
 
 def keyhold(pressed):
   if (pressed[K_j] or pressed[K_s] or pressed[K_DOWN]) and g.active:
-    g.active.vy += 1.0 * g.active.inertia
+    g.active.vy += 30.0 * g.active.inertia * g.dt
   if (pressed[K_k] or pressed[K_w] or pressed[K_UP]) and g.active:
-    g.active.vy -= 1.0 * g.active.inertia
+    g.active.vy -= 30.0 * g.active.inertia * g.dt
   if (pressed[K_h] or pressed[K_a] or pressed[K_LEFT]) and g.active:
-    g.active.vx -= 1.0 * g.active.inertia
+    g.active.vx -= 30.0 * g.active.inertia * g.dt
   if (pressed[K_l] or pressed[K_d] or pressed[K_RIGHT]) and g.active:
-    g.active.vx += 1.0 * g.active.inertia
+    g.active.vx += 30.0 * g.active.inertia * g.dt
 
 
 def click(action, pos, button):
