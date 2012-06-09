@@ -34,18 +34,6 @@ from pygame.locals import *
 from random import random, randint, choice, shuffle
 tau = 2 * pi
 
-# -- INDEX --
-# class Globals
-# def run()
-# def draw()
-# class Actor
-# class Monster(Actor)
-# class Tower(Actor)
-# class Wave
-# def keypress(key)
-# def keyhold(pressed)
-# def click(action, pos, button)
-
 # -- TODO --
 # Add more types of enemies?
 # Progress events by ingame time, not by real time (can be paused) or frames (can slow down)
