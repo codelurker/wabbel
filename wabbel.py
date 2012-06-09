@@ -20,6 +20,7 @@ Tab: Select next bubble
 0-9: Select certain bubbles, ordered by size
 F3: Send the next wave of enemies
 F11: Toggle fullscreen (unix only)
+F5: Clear the message log
 Drag&Drop, Arrow Keys or hjkl: Move the active bubble
 Escape: quit"""
 
@@ -164,9 +165,7 @@ def run_game():
   pygame.init()
   pygame.font.init()
   pygame.key.set_repeat(180, 80)
-  flags = pygame.DOUBLEBUF
-  if g.fullscreen:
-    flags |= pygame.FULLSCREEN
+  flags = DOUBLEBUF | (g.fullscreen and FULLSCREEN)
   g.screen = pygame.display.set_mode((g.w, g.h), flags, 32)
   g.font_small = pygame.font.Font(g.font_name, g.font_size[0])
   g.font = pygame.font.Font(g.font_name, g.font_size[1])
@@ -419,6 +418,7 @@ class Monster(Actor):
     damage = max(0, damage - self.armor * (1 - tower.armor_pierce))
     self.hp -= damage
     self.color = _scale_color(self.original_color, self.hp / self.maxhp)
+    self.color = [max(0, min(255, int(c * self.hp / self.maxhp))) for c in self.original_color]
     self.speed -= tower.freeze * self.original_speed
     self.speed = min(self.original_speed, max(self.original_speed *
       g.monster_min_speed, self.speed))
@@ -564,9 +564,7 @@ class Tower(Actor):
 
   def _get_monsters_in_range(self, r, x, y):
     for mob in g.mobs:
-      if mob.hp > 0 and \
-          abs(mob.x - x) < r and \
-          abs(mob.y - y) < r and \
+      if mob.hp > 0 and abs(mob.x - x) < r and abs(mob.y - y) < r and \
           mob.distance(x, y) < r:
         yield mob
 
@@ -682,12 +680,6 @@ def click(action, pos, button):
       g.drag = None
   elif button == 3:
     g.active = None
-
-
-def _scale_color(color, factor):
-  return (max(0, min(255, int(color[0] * factor))),
-      max(0, min(255, int(color[1] * factor))),
-      max(0, min(255, int(color[2] * factor))))
 
 
 def _draw_bar(x, y, length, width, color):
