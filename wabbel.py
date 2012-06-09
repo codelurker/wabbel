@@ -31,7 +31,7 @@ import time
 from collections import deque
 from math import sin, cos, atan2, pi, sqrt
 from pygame.locals import *
-from random import randint, choice, shuffle
+from random import random, randint, choice, shuffle
 tau = 2 * pi
 
 # -- INDEX --
@@ -123,7 +123,7 @@ class Globals(object):
     Variables that are initialized here are updated every time the level is
     changed, which occurs every g.waves_per_level waves.
     """
-    g.level_color = _random_color(0xff)
+    g.level_color = _random_color(0xaf)
     g.checkpoints = [(int(d[0] * g.w / 10), int(d[1] * g.h / 10)) for d in
         choice(g.level_layouts)]
     if randint(0,1) == 0:
@@ -308,7 +308,6 @@ def draw():
     g.screen.blit(text, (x, y))
     y += text.get_rect().height + 2
 
-#  line = "%d fps  score: %d" % (g.clock.get_fps(), g.score)
   line = str(g.score)
   text = g.font.render(line, 1, (150, 150, 150))
   g.screen.blit(text, (10, g.h-10-text.get_rect().height))
@@ -519,29 +518,29 @@ class Tower(Actor):
           tower.update_stats()
 
   def draw(self):
-    whalf = (1 + 0.2 *-sin(self.phase+0.2)) * self.radius
-    hhalf = (1 + 0.2 * sin(self.phase)) * self.radius
-    x = int(self.x - whalf)
-    y = int(self.y - hhalf)
-    rect = Rect(x-1, y-1, whalf*2+2, hhalf*2+2)
+    width  = (1 - 0.2 * sin(self.phase+0.2)) * self.radius * 2
+    height = (1 + 0.2 * sin(self.phase)) * self.radius * 2
+    x = int(self.x - width / 2)
+    y = int(self.y - height / 2)
+    rect = Rect(x - 1, y - 1, width + 2, height + 2)
     pygame.draw.ellipse(g.screen, (20, 20, 20), rect, 0)
-    rect = Rect(x, y, whalf*2, hhalf*2)
+    rect = Rect(x, y, width, height)
     pygame.draw.ellipse(g.screen, self.color, rect, 0)
     if self.target_point:
       pygame.draw.circle(g.screen, self.color, self.target_point, self.radius, 0)
       pygame.draw.line(g.screen, self.color, self.pos, self.target_point, self.radius)
       self.target_point = None
 
-  def _get_monsters_in_range(self):
+  def _get_monsters_in_range(self, r, x, y):
     for mob in g.mobs:
       if mob.hp > 0 and \
-          abs(mob.x - self.x) < self.range and \
-          abs(mob.y - self.y) < self.range and \
-          self.distance(mob.x, mob.y) < self.range:
+          abs(mob.x - x) < r and \
+          abs(mob.y - y) < r and \
+          mob.distance(x, y) < r:
         yield mob
 
   def shoot(self):
-    mobs = list(self._get_monsters_in_range())
+    mobs = list(self._get_monsters_in_range(self.range, self.x, self.y))
     if not mobs:
       return
     self.last_shot = time.time()
@@ -549,16 +548,12 @@ class Tower(Actor):
 
     self.target_point = target.pos
 
-    for mob in g.mobs:
-      if mob.hp > 0 and \
-          abs(mob.x - target.x) < self.radius and \
-          abs(mob.y - target.y) < self.radius and \
-          target.distance(mob.x, mob.y) < self.radius:
-        if mob.damage(self.damage + self.bonus_damage, self):
-          self.size += 1
-          self.update_stats()
-          g.hp = min(g.maxhp, g.hp + g.hp_per_monster)
-          g.score += mob.level
+    for mob in self._get_monsters_in_range(self.radius, target.x, target.y):
+      if mob.damage(self.damage + self.bonus_damage, self):
+        self.size += 1
+        self.update_stats()
+        g.hp = min(g.maxhp, g.hp + g.hp_per_monster)
+        g.score += mob.level
     if self.bonus_damage:
       self.bonus_damage = 0
       self.update_stats()
@@ -573,8 +568,7 @@ class Wave(object):
 
   def tick(self):
     if self.last_send + self.delay < time.time():
-      mob = Monster(self.level)
-      g.mobs.append(mob)
+      g.mobs.append(Monster(self.level))
       self.monsters_left -= 1
       self.last_send = time.time()
 
@@ -666,14 +660,8 @@ def _draw_bar(x, y, length, width, color):
 
 
 def _random_color(maximum):
-  color = [0, 0, 0]
-  for i in range(min(3*255, maximum)):
-    shuffle(color)
-    for n in range(3):
-      if color[n] < 255:
-        color[n] += 1
-        break
-  return color
+  color = [random(), random(), random()]
+  return [min(255, int(maximum / sum(color) * n)) for n in color]
 
 
 def _highscore_sorting_key(line):
@@ -689,7 +677,6 @@ if __name__ == '__main__':
 
   if '--help' in sys.argv or '-h' in sys.argv:
     print(__doc__)
-
   elif '--version' in sys.argv:
     print(g.version)
 
