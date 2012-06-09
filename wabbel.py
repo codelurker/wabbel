@@ -248,6 +248,9 @@ def draw_game():
   g.screen.fill((0, 0, 0))
   if g.active:
     pygame.draw.circle(g.screen, g.range_color, g.active.pos, g.active.range, 0)
+    pygame.draw.line(g.screen, g.active.color, g.active.pos,
+        (g.active.x + cos(g.game_time*3) * g.active.range,
+         g.active.y - sin(g.game_time*3) * g.active.range), 2)
 
   if g.shake_until > g.game_time:
     g.shake = (randint(-3,3), randint(-3,3))
